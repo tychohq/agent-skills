@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+#
+# export-pdf - Convert a markdown file to PDF using pandoc + PyMuPDF
+#
+# Usage:
+#   export-pdf <input.md> [output.pdf]
+#
+# If output.pdf is not specified, saves to the same directory as input with .pdf extension.
+#
+# Requires: pandoc (brew install pandoc / apt install pandoc)
+# PyMuPDF is handled automatically via uvx.
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+error() { echo -e "${RED}Error:${NC} $1" >&2; exit 1; }
+success() { echo -e "${GREEN}✓${NC} $1"; }
+
+if [[ $# -lt 1 ]]; then
+    echo "Usage: export-pdf <input.md> [output.pdf]"
+    exit 1
+fi
+
+INPUT="$1"
+[[ -f "$INPUT" ]] || error "File not found: $INPUT"
+
+# Default output: same dir, same name, .pdf extension
+if [[ $# -ge 2 ]]; then
+    OUTPUT="$2"
+else
+    OUTPUT="${INPUT%.md}.pdf"
+fi
+
+# Check for pandoc
+command -v pandoc >/dev/null 2>&1 || error "pandoc not found. Install with: brew install pandoc (macOS) or apt install pandoc (Linux)"
+
+# Check for uv/uvx
+if ! command -v uvx >/dev/null 2>&1; then
+    error "uvx not found. Install uv with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+fi
+
+# Create temp file for HTML
+TMPHTML=$(mktemp /tmp/export-pdf-XXXXXX.html)
+trap "rm -f '$TMPHTML'" EXIT
+
+# Step 1: Markdown → HTML
+pandoc "$INPUT" -o "$TMPHTML" --standalone
+
+# Step 2: HTML → PDF via uvx (auto-installs PyMuPDF if needed)
+uvx --with pymupdf python3 << PYTHON
+import fitz
+import os
+
+with open('$TMPHTML', 'r') as f:
+    html = f.read()
+
+story = fitz.Story(html)
+writer = fitz.DocumentWriter('$OUTPUT')
+mediabox = fitz.paper_rect('letter')
+margins = (36, 36, -36, -36)  # 0.5 inch margins
+where = mediabox + margins
+
+more = True
+while more:
+    dev = writer.begin_page(mediabox)
+    more, _ = story.place(where)
+    story.draw(dev)
+    writer.end_page()
+
+writer.close()
+PYTHON
+
+success "Created: $OUTPUT"

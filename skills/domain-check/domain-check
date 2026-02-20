@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Domain availability + pricing checker using Vercel Registrar API
+# Usage: domain-check <domain> [tld1,tld2,...]
+
+set -euo pipefail
+
+DOMAIN="${1:-}"
+TLDS="${2:-com,io,dev,ai,co,app,org,net,xyz}"
+
+if [[ -z "$DOMAIN" ]]; then
+  echo "Usage: domain-check <domain> [tld1,tld2,...]"
+  echo "Example: domain-check myproject com,io,dev"
+  exit 1
+fi
+
+# Load Vercel token
+AUTH_FILE="$HOME/.local/share/com.vercel.cli/auth.json"
+if [[ ! -f "$AUTH_FILE" ]]; then
+  echo "Error: Vercel CLI not authenticated. Run 'npx vercel login' first."
+  exit 1
+fi
+VERCEL_TOKEN=$(jq -r '.token' "$AUTH_FILE")
+TEAM="team_3VJsNIVGnCSMdOeEmg6zhQxY"
+
+echo "Checking: $DOMAIN"
+echo "-----------------------------------------------------------"
+printf "%-25s %-14s %-12s %-12s\n" "DOMAIN" "STATUS" "BUY PRICE" "RENEWAL"
+echo "-----------------------------------------------------------"
+
+IFS=',' read -ra TLD_ARRAY <<< "$TLDS"
+for tld in "${TLD_ARRAY[@]}"; do
+  FULL_DOMAIN="${DOMAIN}.${tld}"
+  
+  result=$(curl -s "https://api.vercel.com/v1/registrar/domains/${FULL_DOMAIN}/price?teamId=${TEAM}" \
+    -H "Authorization: Bearer ${VERCEL_TOKEN}" 2>&1)
+  
+  buy=$(echo "$result" | jq -r '.purchasePrice // empty')
+  renew=$(echo "$result" | jq -r '.renewalPrice // empty')
+  err=$(echo "$result" | jq -r '.error.message // empty')
+  
+  if [[ -n "$err" ]]; then
+    printf "%-25s %-14s %-12s %-12s\n" "$FULL_DOMAIN" "⚠️  Error" "-" "-"
+  elif [[ -z "$buy" || "$buy" == "null" ]]; then
+    printf "%-25s %-14s %-12s %-12s\n" "$FULL_DOMAIN" "❌ Taken" "-" "\$${renew:-N/A}"
+  else
+    printf "%-25s %-14s %-12s %-12s\n" "$FULL_DOMAIN" "✅ Available" "\$${buy}" "\$${renew:-N/A}"
+  fi
+done
+
+echo "-----------------------------------------------------------"
+echo "Prices from Vercel Registrar"
