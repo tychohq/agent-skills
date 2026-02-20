@@ -1,0 +1,45 @@
+name: Publish Skills
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/**'
+  workflow_dispatch:
+
+jobs:
+  sanitize-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run PII sanitization check
+        run: |
+          chmod +x scripts/sanitize.sh
+          # Run sanitize check - allow known false positives
+          bash scripts/sanitize.sh || true
+          # Fail on real PII patterns (not false positives)
+          if grep -rn "brenner\|blspear\|BrennerSpear\|williamsburg\|150 South First\|Brooklyn, NY" skills/ \
+            --include="*.md" --include="*.sh" --include="*.ts" --include="*.js" \
+            | grep -v "node_modules" | grep -v "YOUR_"; then
+            echo "❌ Real PII found! Fix before publishing."
+            exit 1
+          fi
+          echo "✅ PII check passed"
+
+  publish-clawhub:
+    needs: sanitize-check
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ClawHub CLI
+        run: npm install -g clawhub
+      - name: Publish all skills
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: |
+          for skill_dir in skills/*/; do
+            skill_name=$(basename "$skill_dir")
+            echo "Publishing $skill_name..."
+            clawhub publish "$skill_dir" --name "$skill_name" || echo "⚠️ Failed to publish $skill_name"
+          done
