@@ -1,6 +1,7 @@
 ---
 name: amazon
 description: Buy and return items on Amazon using browser automation. Use for purchasing, reordering, checking order history, and processing returns.
+compatibility: Requires agent-browser CLI with Chrome DevTools Protocol (CDP). Chrome must be running with --remote-debugging-port. Optional VNC for headless setups.
 ---
 
 # Amazon Ordering
@@ -107,11 +108,16 @@ agent-browser click @[place-order-ref]
 ## Starting the browser (if not running)
 
 ```bash
+# Linux (headless with Xvfb/VNC)
 DISPLAY=:99 google-chrome --user-data-dir=$HOME/.config/chrome-openclaw --no-first-run --remote-debugging-port=9222 https://www.amazon.com &
+
+# macOS (opens visible window)
+open -na "Google Chrome" --args --user-data-dir=$HOME/.config/chrome-openclaw --no-first-run --remote-debugging-port=9222 https://www.amazon.com
 ```
 
 ## Notes
 
 - Browser profile persists login at `$HOME/.config/chrome-openclaw`
-- VNC display is `:99` on port 5999 (noVNC on 6080)
-- Order confirmations go to your primary email
+- VNC display is `:99` on port 5999 (noVNC on 6080) — Linux headless only
+- Order confirmations go to the email on your Amazon account
+- CAPTCHAs or 2FA may require manual intervention — if browser is visible, ask the user to solve it
