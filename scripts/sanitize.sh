@@ -41,6 +41,10 @@ PATTERNS=(
   "sk-[a-zA-Z0-9]"
   "token.*=.*['\"]"
 
+  # Service-specific IDs that shouldn't be hardcoded
+  "team_[a-zA-Z0-9]\{20,\}"   # Vercel team IDs
+  "metagame-xyz"
+
   # Discord / Telegram IDs that look personal
   "213168100038803456"
 )

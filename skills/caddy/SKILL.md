@@ -27,7 +27,8 @@ Routes `*.YOUR_DOMAIN` subdomains to local services over HTTPS via Caddy reverse
 
 ## Quick Dev Servers
 
-Use `dev-serve` skill for one-command dev server + Caddy routing:
+Companion skill: [dev-serve](https://clawhub.com/skills/dev-serve) — one-command dev server + Caddy routing.
+
 ```bash
 dev-serve up ~/projects/myapp        # → https://myapp.YOUR_DOMAIN
 dev-serve down myapp

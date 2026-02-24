@@ -68,16 +68,17 @@ The CLI will show price and ask for confirmation before charging.
 
 ```bash
 VERCEL_TOKEN=$(jq -r '.token' ~/.local/share/com.vercel.cli/auth.json)
-TEAM="team_3VJsNIVGnCSMdOeEmg6zhQxY"
+TEAM=$(jq -r '.currentTeam // empty' ~/.local/share/com.vercel.cli/config.json)
+TEAM_PARAM="${TEAM:+?teamId=$TEAM}"
 
 # Check price/availability
-curl -s "https://api.vercel.com/v1/registrar/domains/example.com/price?teamId=$TEAM" \
+curl -s "https://api.vercel.com/v1/registrar/domains/example.com/price${TEAM_PARAM}" \
   -H "Authorization: Bearer $VERCEL_TOKEN"
 # Returns: { "years": 1, "purchasePrice": 11.25, "renewalPrice": 11.25, "transferPrice": 11.25 }
 # purchasePrice: null = taken, number = available
 
 # Buy via API
-curl -s -X POST "https://api.vercel.com/v1/registrar/domains?teamId=$TEAM" \
+curl -s -X POST "https://api.vercel.com/v1/registrar/domains${TEAM_PARAM}" \
   -H "Authorization: Bearer $VERCEL_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "example.com"}'
@@ -111,9 +112,9 @@ curl -s -X POST "https://api.vercel.com/v1/registrar/domains?teamId=$TEAM" \
 
 ## Auth
 
-Vercel CLI is already authenticated on this machine. Token stored at `~/.local/share/com.vercel.cli/auth.json`.
+Requires Vercel CLI authentication (`npx vercel login`). Token is read from `~/.local/share/com.vercel.cli/auth.json`.
 
-Team ID: `team_3VJsNIVGnCSMdOeEmg6zhQxY` (metagame-xyz)
+Team ID is auto-detected from Vercel CLI config, or set `VERCEL_TEAM_ID` env var to override. If neither is set, the personal account is used.
 
 ## Notes
 
