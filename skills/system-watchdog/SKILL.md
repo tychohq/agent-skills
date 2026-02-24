@@ -1,11 +1,11 @@
 ---
 name: system-watchdog
-description: System resource monitoring that detects wasteful or suspicious processes. Outputs structured JSON for any consumer. Includes an OpenClaw cron definition for scheduled monitoring.
+description: System resource monitoring that detects wasteful or suspicious processes. Outputs structured JSON for any consumer.
 ---
 
 # System Watchdog
 
-Monitor system resources and flag wasteful or suspicious processes. Works standalone as a bash script or scheduled via OpenClaw cron.
+Monitor system resources and flag wasteful or suspicious processes. Works standalone as a bash script — see `openclaw.md` for scheduled cron setup.
 
 ## Standalone Usage
 
@@ -60,25 +60,6 @@ Outputs a JSON object to stdout. Parse it however you like — pipe to `jq`, fee
 - `whisper` / `whisper-server` — speech-to-text servers consuming GPU/RAM
 - `python` / `python3` — runaway scripts or leaked processes
 - `node` — dev servers or builds that never stopped
-
-## OpenClaw Cron Setup
-
-To run this as a scheduled job in OpenClaw, use the provided `openclaw-cron.json`:
-
-```bash
-openclaw cron add < openclaw-cron.json
-```
-
-The cron definition:
-- Runs daily at 4 AM (configurable — edit `schedule.expr` and `schedule.tz`)
-- Uses Sonnet for the check (cheap, reliable for tool calls)
-- Only sends a report when `suspicious: true`
-- Sends via the `message` tool — configure your delivery channel in the task message
-
-**Customize before installing:**
-- Edit `schedule.tz` to your timezone
-- Edit the `message` field in `payload` to specify your preferred notification channel/target
-- Replace `<SKILL_DIR>` with the actual path to the skill directory
 
 ## Agent Workflow (for AI agents)
 
