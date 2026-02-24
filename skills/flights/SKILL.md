@@ -1,114 +1,108 @@
 ---
 name: flights
-description: Search flights via Google Flights. Find nonstop/connecting flights, filter by time and cabin class, get booking links.
+description: Search flights via Google Flights. Find nonstop/connecting flights, filter by time, airline, and cabin class. Find cheapest dates to fly. No API key required.
 ---
 
 # Flight Search
 
-Search real-time flight schedules and prices via Google Flights data.
+Search real-time flight schedules and prices via Google Flights data using the `fli` CLI.
 
 ## Prerequisites
 
 ```bash
-pip install fast-flights
+# Install via pip, pipx, or uv
+pip install flights
+# or
+pipx install flights
+# or
+uv tool install flights
 ```
 
-The `flights-search` CLI is installed at `~/.local/bin/flights-search`.
+Verify: `fli --help`
 
-## CLI Usage
+## Commands
+
+### `fli flights` — Search flights on a specific date
 
 ```bash
-flights-search <origin> <destination> <date> [options]
+fli flights <origin> <destination> <date> [options]
 ```
 
-### Examples
+**Examples:**
 
 ```bash
-# Basic search (auto-shows fewest stops available)
-flights-search YYZ EWR 2026-02-06
+# Basic search
+fli flights JFK LAX 2026-03-15
 
-# Nonstop flights only
-flights-search YYZ JFK 2026-02-06 --nonstop
+# Nonstop only, sorted by departure time
+fli flights JFK LAX 2026-03-15 --stops 0 --sort DEPARTURE_TIME
 
-# Filter by departure time (24h format)
-flights-search YYZ EWR 2026-02-06 --after 18        # After 6pm
-flights-search YYZ EWR 2026-02-06 --before 12       # Before noon
-flights-search YYZ EWR 2026-02-06 --after 9 --before 14
+# Evening departures only
+fli flights JFK LAX 2026-03-15 --time 18-24
 
-# Cabin class
-flights-search YYZ EWR 2026-02-06 --class economy   # default
-flights-search YYZ EWR 2026-02-06 --class premium   # premium economy
-flights-search YYZ EWR 2026-02-06 --class business
-flights-search YYZ EWR 2026-02-06 --class first
+# Business class on specific airlines
+fli flights JFK LHR 2026-03-15 --class BUSINESS --airlines BA VS
 
-# Get Google Flights booking link
-flights-search YYZ EWR 2026-02-06 --class business --link
-
-# Multiple passengers
-flights-search YYZ EWR 2026-02-06 --passengers 2
-
-# Show all flights (ignore stop minimization)
-flights-search YYZ EWR 2026-02-06 --all-stops
+# Round-trip
+fli flights JFK LHR 2026-03-15 --return 2026-03-22
 ```
 
-### Options
+**Options:**
 
-| Option | Description |
-|--------|-------------|
-| `--nonstop` | Force nonstop only |
-| `--all-stops` | Show all flights regardless of stops |
-| `--after HH` | Depart after hour (24h format) |
-| `--before HH` | Depart before hour (24h format) |
-| `--class` | Cabin: economy, premium, business, first |
-| `--passengers N` | Number of travelers |
-| `--link` | Print Google Flights URL |
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--time` | `-t` | Departure time window, 24h format (e.g., `6-20`, `18-24`) |
+| `--airlines` | `-a` | Filter by airline IATA codes (e.g., `BA KL DL`) |
+| `--class` | `-c` | `ECONOMY`, `PREMIUM_ECONOMY`, `BUSINESS`, `FIRST` |
+| `--stops` | `-s` | `ANY`, `0` (nonstop), `1`, `2+` |
+| `--sort` | `-o` | `CHEAPEST`, `DURATION`, `DEPARTURE_TIME`, `ARRIVAL_TIME` |
+| `--return` | `-r` | Return date for round-trip (YYYY-MM-DD) |
 
-## Default Behavior
+### `fli dates` — Find cheapest dates to fly
 
-By default, the CLI shows only flights with the **minimum stops available**:
-- If nonstops exist → shows only nonstops
-- If no nonstops → shows only 1-stop flights
-- Use `--all-stops` to see everything
-
-## Output
-
-```
-Depart                       Arrive                       Airline         Price      Duration
-----------------------------------------------------------------------------------------------------
-6:00 PM Fri, Feb 6           7:38 PM Fri, Feb 6           Air Canada      $361       1 hr 38 min
-9:10 PM Fri, Feb 6           10:48 PM Fri, Feb 6          Air Canada      $361       1 hr 38 min
-
-2 nonstop flight(s) found.
+```bash
+fli dates <origin> <destination> [options]
 ```
 
-## Data Source
+**Examples:**
 
-Uses Google Flights data via the `fast-flights` library (reverse-engineered protobuf API). No API key required.
+```bash
+# Cheapest dates in the next 2 months
+fli dates JFK LAX --sort
+
+# Cheapest Friday departures
+fli dates JFK LAX --friday --sort
+
+# Nonstop weekend flights in March
+fli dates JFK LAX --from 2026-03-01 --to 2026-03-31 --friday --saturday --stops 0
+
+# Round-trip with 7-day duration
+fli dates JFK LHR --round --duration 7 --sort
+```
+
+**Options:**
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--from` | | Start date (default: today) |
+| `--to` | | End date (default: +2 months) |
+| `--duration` | `-d` | Trip duration in days (default: 3) |
+| `--round` | `-R` | Search round-trip |
+| `--sort` | | Sort by price (lowest first) |
+| `--monday` through `--sunday` | `-mon` through `-sun` | Filter by day of week |
+| `--time` | `-time` | Departure time window (e.g., `6-20`) |
+| `--airlines` | `-a` | Filter by airline IATA codes |
+| `--class` | `-c` | Cabin class |
+| `--stops` | `-s` | Max stops |
 
 ## Notes
 
-- Date format: `YYYY-MM-DD`
-- Airport codes: Standard IATA codes (JFK, LAX, YYZ, etc.)
-- Prices are in USD
+- **Date format:** `YYYY-MM-DD`
+- **Airport codes:** Standard IATA codes (JFK, LAX, LHR, NRT, etc.)
+- **No API key required** — uses Google Flights data via reverse-engineered API
+- Prices shown in USD
 - Times shown in local airport timezone
 
-## ⚠️ Known Issues (Feb 14, 2026)
+## Data Source
 
-**`flights-search` CLI is not installed.** The symlink at `~/.local/bin/flights-search` doesn't exist. Use `uvx --with fast-flights python3` inline as a workaround:
-
-```python
-# fast-flights API uses keyword-only args now (old positional API is dead)
-from fast_flights import FlightData, Passengers, get_flights
-
-fd = FlightData(date="2026-02-20", from_airport="EWR", to_airport="BER", max_stops=0)
-result = get_flights(
-    flight_data=[fd],
-    trip='one-way',
-    passengers=Passengers(adults=1),
-    seat='economy',
-)
-for f in result.flights:
-    print(f.departure, f.arrival, f.airline, f.price, f.duration)
-```
-
-**"No flights found" with HTML dump:** When no flights match filters, the library dumps raw Google Flights HTML in the error. This is correct — Google itself has no results for that route/filter combo.
+Uses Google Flights data via the [`flights`](https://github.com/punitarani/fli) Python package. No scraping — uses Google's protobuf API directly.
