@@ -8,9 +8,10 @@ compatibility: Requires agent-browser CLI with Chrome DevTools Protocol (CDP). C
 
 ## Prerequisites
 
-- Browser logged into Amazon (use `agent-browser` with CDP on port 9222)
-- If logged out, retrieve password from your password manager
-- VNC access (if using headless): `ssh -L 6080:localhost:6080 <host>` then http://localhost:6080/vnc.html
+- `agent-browser` CLI installed
+- Chrome running with `--remote-debugging-port=9222` (see [Starting the browser](#starting-the-browser-if-not-running))
+- Logged into Amazon — if logged out, retrieve password from your password manager
+- If running headless (Linux/VNC), forward the VNC port to verify visually: `ssh -L 6080:localhost:6080 <host>` → http://localhost:6080/vnc.html
 
 ## Setup
 
@@ -107,17 +108,24 @@ agent-browser click @[place-order-ref]
 
 ## Starting the browser (if not running)
 
+**macOS** (opens a visible Chrome window):
 ```bash
-# Linux (headless with Xvfb/VNC)
-DISPLAY=:99 google-chrome --user-data-dir=$HOME/.config/chrome-openclaw --no-first-run --remote-debugging-port=9222 https://www.amazon.com &
-
-# macOS (opens visible window)
 open -na "Google Chrome" --args --user-data-dir=$HOME/.config/chrome-openclaw --no-first-run --remote-debugging-port=9222 https://www.amazon.com
+```
+
+**Linux** (headless with Xvfb/VNC):
+```bash
+DISPLAY=:99 google-chrome --user-data-dir=$HOME/.config/chrome-openclaw --no-first-run --remote-debugging-port=9222 https://www.amazon.com &
+```
+
+**Linux** (desktop/GUI session):
+```bash
+google-chrome --user-data-dir=$HOME/.config/chrome-openclaw --no-first-run --remote-debugging-port=9222 https://www.amazon.com &
 ```
 
 ## Notes
 
 - Browser profile persists login at `$HOME/.config/chrome-openclaw`
-- VNC display is `:99` on port 5999 (noVNC on 6080) — Linux headless only
+- On headless Linux, VNC display is typically `:99` on port 5999 (noVNC on 6080)
 - Order confirmations go to the email on your Amazon account
-- CAPTCHAs or 2FA may require manual intervention — if browser is visible, ask the user to solve it
+- CAPTCHAs or 2FA may require manual intervention — if the browser window is visible (macOS or Linux desktop), ask the user to solve it in the Chrome window
