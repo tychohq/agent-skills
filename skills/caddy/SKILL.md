@@ -1,15 +1,18 @@
 ---
 name: caddy
-description: Add, manage, and troubleshoot Caddy reverse proxy routes for local apps on YOUR_DOMAIN.
+description: Add, manage, and troubleshoot Caddy reverse proxy routes for local apps via wildcard subdomains.
+compatibility: macOS (LaunchDaemon) or Linux (systemd). Requires Caddy, Tailscale, Vercel DNS account.
 ---
 
-# Caddy — Add, Manage, and Troubleshoot Apps on Mac Mini
+# Caddy — Wildcard Reverse Proxy for Local Apps
 
-Routes `*.YOUR_DOMAIN` subdomains to local services over HTTPS via Caddy reverse proxy. Only accessible on the Tailscale network.
+Routes `*.YOUR_DOMAIN` subdomains to local services over HTTPS via Caddy reverse proxy with automatic Let's Encrypt certificates. Designed for Tailscale-only access (no public exposure).
+
+> **DNS provider:** This skill uses **Vercel DNS** for DNS-01 ACME challenges. If you use a different DNS provider, swap the `caddy-dns/vercel` plugin and TLS snippet for your provider's equivalent (see [caddy-dns](https://github.com/caddy-dns)).
 
 ## Add a New App
 
-1. **Create a LaunchAgent** — see `reference.md` for the plist template
+1. **Create a background service** (LaunchAgent on macOS, systemd on Linux) — see `reference.md` for templates
 2. **Add to Caddyfile** (`~/.config/caddy/Caddyfile`):
    ```caddy
    appname.YOUR_DOMAIN {
@@ -41,25 +44,20 @@ dev-serve ls
 # Reload config (no restart, no sudo)
 ~/.local/bin/caddy reload --config ~/.config/caddy/Caddyfile --address localhost:2019
 
-# Full restart (needs sudo)
+# Full restart
+# macOS:
 sudo launchctl unload /Library/LaunchDaemons/com.caddyserver.caddy.plist
 sudo launchctl load /Library/LaunchDaemons/com.caddyserver.caddy.plist
-```
-
-## Rebuild Caddy Binary
-
-```bash
-cd ~/projects/caddy-vercel-patched
-xcaddy build --with github.com/caddy-dns/vercel=./vercel-patched
-cp caddy ~/.local/bin/caddy
+# Linux:
+systemctl --user restart caddy
 ```
 
 ## Troubleshoot
 
 - **Cert not issuing:** `tail -50 /var/log/caddy-error.log | grep -i error` — likely expired Vercel API token
-- **DNS not resolving:** `dig +short appname.YOUR_DOMAIN` — should be `YOUR_TAILSCALE_IP`
+- **DNS not resolving:** `dig +short appname.YOUR_DOMAIN` — should return your Tailscale IP
 - **TLS error (curl exit 35):** Cert hasn't provisioned yet, wait 30-60s
 - **Gateway "origin not allowed":** Add origin to `gateway.controlUi.allowedOrigins`
 - **Gateway "secure context" error:** Set `gateway.controlUi.allowInsecureAuth: true`
 
-For full reference (apps table, key files, gateway config, Studio specifics): see `reference.md` in this folder.
+For full reference (example apps, key files, gateway config, build instructions): see `reference.md` in this folder.

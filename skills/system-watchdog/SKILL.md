@@ -1,78 +1,93 @@
+---
+name: system-watchdog
+description: System resource monitoring that detects wasteful or suspicious processes. Outputs structured JSON for any consumer. Includes an OpenClaw cron definition for scheduled monitoring.
+---
+
 # System Watchdog
 
-Nightly system resource monitoring for the NUC (32GB RAM, Linux). Detects wasteful or suspicious processes and reports via Telegram only when something needs attention.
+Monitor system resources and flag wasteful or suspicious processes. Works standalone as a bash script or scheduled via OpenClaw cron.
 
-## How to Invoke
+## Standalone Usage
+
+Run the check script directly — no OpenClaw required:
 
 ```bash
-bash ~/.openclaw/workspace/skills/system-watchdog/check.sh
+bash check.sh
 ```
 
-The script outputs JSON to stdout. Parse the output and decide whether to report.
+Outputs a JSON object to stdout. Parse it however you like — pipe to `jq`, feed to an agent, integrate into your own monitoring stack.
 
-## Output Format
-
-The script outputs a JSON object with:
+### Output Format
 
 ```json
 {
-  "suspicious": true|false,
-  "system": {
-    "ram_used_gb": 12.3,
-    "ram_total_gb": 31.2,
-    "ram_pct": 39.4,
-    "swap_used_gb": 0.5,
-    "swap_total_gb": 8.0,
-    "swap_pct": 6.3,
-    "load_1m": 1.2,
-    "load_5m": 0.8,
-    "load_15m": 0.6,
-    "cpu_cores": 8
+  "suspicious": true,
+  "summary": {
+    "ram": "12.3/31.2 GB (39%)",
+    "swap": "0.5/8.0 GB (6%)",
+    "load": "1.2/0.8/0.6",
+    "cores": 8,
+    "disk": "120/256 GB (45%)"
   },
-  "disk": [
-    { "filesystem": "/dev/sda1", "mount": "/", "used_pct": 45, "used_gb": 120, "total_gb": 256 }
-  ],
   "issues": [
     {
-      "type": "high_ram|high_cpu|zombie|stale|swap|disk",
-      "description": "...",
-      "details": { ... }
+      "type": "high_ram",
+      "description": "claude (PID 1234) 4650MB RAM",
+      "details": { "pid": 1234, "name": "claude", "cpu_pct": 2.1, "mem_mb": 4650, "elapsed": "3d" }
     }
   ],
   "top_processes": [
-    { "pid": 1234, "user": "youruser", "name": "claude", "cpu_pct": 2.1, "mem_pct": 14.5, "mem_mb": 4650, "elapsed": "3-02:15:30", "elapsed_human": "3 days" }
+    { "pid": 1234, "name": "claude", "cpu_pct": 2.1, "mem_mb": 4650, "elapsed": "3d" }
   ]
 }
 ```
 
-## Thresholds That Trigger a Report
+- `suspicious: true` → at least one issue exceeded a threshold
+- `suspicious: false` → system looks healthy
+
+### Thresholds
 
 | Check | Threshold | Issue Type |
 |-------|-----------|------------|
 | Process RAM | > 4096 MB | `high_ram` |
 | Process CPU | > 50% | `high_cpu` |
-| Zombie processes | Any | `zombie` |
-| Stale processes | Running > 2 days AND cumulative CPU > 10 min | `stale` |
-| Swap usage | > 50% of total | `swap` |
-| Disk usage | > 80% on any mount | `disk` |
+| Stale processes | Running > 2 days AND using > 100 MB or > 1% CPU | `stale` |
+| Disk usage | > 80% on root mount | `disk` |
 
-If **any** issue is found, `suspicious` is `true` and a report should be sent.
+### Common Offenders
 
-## Common Offenders
-
-- `claude` — AI coding agent processes left running for days/weeks
+- `claude` / `codex` — AI coding agents left running for days
 - `whisper` / `whisper-server` — speech-to-text servers consuming GPU/RAM
 - `python` / `python3` — runaway scripts or leaked processes
 - `node` — dev servers or builds that never stopped
 
-## Agent Workflow
+## OpenClaw Cron Setup
+
+To run this as a scheduled job in OpenClaw, use the provided `openclaw-cron.json`:
+
+```bash
+openclaw cron add < openclaw-cron.json
+```
+
+The cron definition:
+- Runs daily at 4 AM (configurable — edit `schedule.expr` and `schedule.tz`)
+- Uses Sonnet for the check (cheap, reliable for tool calls)
+- Only sends a report when `suspicious: true`
+- Sends via the `message` tool — configure your delivery channel in the task message
+
+**Customize before installing:**
+- Edit `schedule.tz` to your timezone
+- Edit the `message` field in `payload` to specify your preferred notification channel/target
+- Replace `<SKILL_DIR>` with the actual path to the skill directory
+
+## Agent Workflow (for AI agents)
 
 1. Run `check.sh`
 2. Parse the JSON output
-3. If `suspicious` is `false` → do nothing (no message)
-4. If `suspicious` is `true` → format a concise Telegram report and send to main topic
+3. If `suspicious` is `false` → do nothing (no report needed)
+4. If `suspicious` is `true` → format a concise report and notify the user
 
-### Report Format (Telegram)
+### Suggested Report Format
 
 ```
 ⚠️ System Watchdog Report
@@ -83,17 +98,13 @@ If **any** issue is found, `suspicious` is `true` and a report should be sent.
 🔴 Issues Found:
 
 HIGH RAM — claude (PID 1234)
-  CPU: 2.1% | RAM: 4650 MB (14.5%) | Running: 3 days
+  CPU: 2.1% | RAM: 4650 MB | Running: 3 days
   → Likely stale, safe to kill
 
-ZOMBIE — [defunct] (PID 5678)
-  Parent PID: 1230
-  → Kill parent or reap
-
-💡 Suggested: kill 1234 5678
+💡 Suggested: kill 1234
 ```
 
-## Known Issues
+## Platform Notes
 
-- **Intermittent jq parse error:** `check.sh` sometimes fails with "invalid JSON text passed to --argjson" on first run, but succeeds on immediate retry. Likely a race condition where a variable from the process scan is empty/malformed. If the watchdog agent gets this error, retry once before reporting failure.
-- **macOS incompatibility:** `check.sh` uses `free` (Linux-only) for RAM/swap stats. On macOS (Mac Mini), this fails with `command not found: free`. The script needs to be adapted to use `sysctl hw.memsize` / `vm_stat` on macOS, or the cron should only be enabled on Linux hosts.
+- **macOS only** — `check.sh` uses `sysctl`, `vm_stat`, and macOS `ps` flags. It won't work on Linux without adaptation (replace with `free`, `/proc/meminfo`, etc.).
+- **Intermittent jq-style parse error** — the script occasionally fails on first run due to a race in process scanning. Retry once before reporting failure.
