@@ -9,14 +9,39 @@
  * Requires: npm install -g elkjs  (or install locally where you run this)
  */
 
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { createRequire } from "module";
+import { execSync } from "child_process";
+import { join } from "path";
 
+// Resolve elkjs: try local, then common global locations
 let ELK;
+const require = createRequire(import.meta.url);
 try {
-  ELK = (await import("elkjs")).default;
+  ELK = require("elkjs");
 } catch {
-  console.error("Error: elkjs not found. Install it: npm install -g elkjs");
-  process.exit(1);
+  // Probe common global node_modules paths
+  const candidates = [
+    "/opt/homebrew/lib/node_modules",          // macOS Homebrew ARM
+    "/usr/local/lib/node_modules",             // macOS Homebrew Intel / Linux
+    join(process.env.HOME || "", ".bun/install/global/node_modules"),
+    join(process.env.HOME || "", ".npm-global/lib/node_modules"),
+    join(process.env.HOME || "", ".local/lib/node_modules"),
+  ];
+  let found = false;
+  for (const dir of candidates) {
+    if (existsSync(join(dir, "elkjs"))) {
+      try {
+        ELK = createRequire(join(dir, "_"))("elkjs");
+        found = true;
+        break;
+      } catch { /* continue */ }
+    }
+  }
+  if (!found) {
+    console.error("Error: elkjs not found. Install it globally (e.g. npm install -g elkjs)");
+    process.exit(1);
+  }
 }
 
 const elk = new ELK();
