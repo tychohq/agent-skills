@@ -22,7 +22,6 @@ Adapt this table to your own setup. The pattern: one subdomain per app, each pro
 | URL | App | Local Port | Service |
 |-----|-----|------------|---------|
 | https://YOUR_DOMAIN | Dashboard | — (inline HTML in Caddyfile) | — |
-| https://openclaw.YOUR_DOMAIN | OpenClaw Gateway | 18789 | `ai.openclaw.gateway` |
 | https://myapp.YOUR_DOMAIN | Your Web App | 3100 | `com.yourusername.myapp` |
 | https://api.YOUR_DOMAIN | API Server | 3101 | `com.yourusername.api` |
 
@@ -61,7 +60,6 @@ Phone/Laptop (Tailscale)
 | **Vercel API token** | In LaunchDaemon plist env vars | `~/.secrets/vercel/.env` (EnvironmentFile) |
 | **Caddy logs** | `/var/log/caddy.log`, `/var/log/caddy-error.log` | `journalctl --user -u caddy` |
 | **DNS records** | Vercel DNS for `YOUR_DOMAIN` | Vercel DNS for `YOUR_DOMAIN` |
-| **Gateway config** | `~/.openclaw/openclaw.json` | `~/.openclaw/openclaw.json` |
 
 ## How to Add a New App
 
@@ -168,63 +166,9 @@ Also add a `<li>` entry in the dashboard HTML block at the top of the Caddyfile.
 
 TLS cert provisioning takes 30–60 seconds for new subdomains (DNS-01 challenge via Vercel API).
 
-### 4. If the app connects to the OpenClaw Gateway
+### 4. (Optional) OpenClaw Gateway integration
 
-Apps that connect to the OpenClaw gateway need additional config:
-
-**a) Add origin to allowedOrigins** in `~/.openclaw/openclaw.json`:
-```json
-"gateway": {
-    "controlUi": {
-        "allowedOrigins": [
-            "https://APPNAME.YOUR_DOMAIN"
-        ]
-    }
-}
-```
-
-**b) If the app needs device pairing**, run:
-```bash
-openclaw devices list       # see pending requests
-openclaw devices approve <request-id>
-```
-
-**c) Restart the gateway** to pick up config changes:
-```bash
-# macOS
-launchctl kickstart -k gui/$(id -u)/ai.openclaw.gateway
-# Linux
-systemctl --user restart openclaw-gateway
-# Or:
-openclaw gateway restart
-```
-
-## Gateway Config for Caddy Proxying
-
-The gateway needs specific config in `~/.openclaw/openclaw.json` to work behind Caddy:
-
-```json
-"gateway": {
-    "trustedProxies": ["127.0.0.1", "::1", "YOUR_TAILSCALE_IP"],
-    "controlUi": {
-        "allowInsecureAuth": true,
-        "allowedOrigins": [
-            "https://openclaw.YOUR_DOMAIN",
-            "https://myapp.YOUR_DOMAIN"
-        ]
-    }
-}
-```
-
-Add each app's `https://SUBDOMAIN.YOUR_DOMAIN` origin as needed.
-
-### Why each setting matters
-
-**`trustedProxies`** — Caddy connects to the gateway from loopback (`::1` / `127.0.0.1`). Without this, the gateway logs `Proxy headers detected from untrusted address` and ignores `X-Forwarded-For`/`X-Forwarded-Proto` headers, treating all connections as non-local. Include `YOUR_TAILSCALE_IP` (Tailscale IP) for any direct Tailscale connections.
-
-**`allowInsecureAuth: true`** — The gateway normally requires device-key authentication (public key signature) for control UI clients. Server-side WebSocket proxies don't support device auth. This setting allows token-only authentication. Without it, the gateway rejects with the misleading error `control ui requires HTTPS or localhost (secure context)`.
-
-**`allowedOrigins`** — The gateway checks the `Origin` header on WebSocket upgrades for control UI and webchat clients. Any UI served from a different subdomain than the gateway itself needs its origin listed here. Without it: `origin not allowed`.
+If your app connects to the OpenClaw gateway, see `OPENCLAW.md` for additional config (trustedProxies, allowedOrigins, device pairing).
 
 ## Custom Caddy Build
 
@@ -342,22 +286,6 @@ dig +short appname.YOUR_DOMAIN  # should be YOUR_TAILSCALE_IP
 
 **App not loading through Caddy (curl exit 35 / TLS error):**
 Cert hasn't provisioned yet. Wait 30-60 seconds. Check Caddy error log for ACME failures.
-
-**Gateway: "Proxy headers detected from untrusted address":**
-Add the proxy's source address to `gateway.trustedProxies` in openclaw.json. For Caddy on the same machine: `["127.0.0.1", "::1", "YOUR_TAILSCALE_IP"]`.
-
-**Gateway: "control ui requires HTTPS or localhost (secure context)":**
-This means device auth is required but the client doesn't support it. Set `gateway.controlUi.allowInsecureAuth: true` in openclaw.json.
-
-**Gateway: "origin not allowed":**
-Add the app's origin to `gateway.controlUi.allowedOrigins` in openclaw.json.
-
-**Gateway: "pairing required":**
-The device needs to be approved:
-```bash
-openclaw devices list
-openclaw devices approve <request-id>
-```
 
 **App showing 502:**
 Check the app's logs. Common causes:

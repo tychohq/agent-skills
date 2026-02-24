@@ -26,7 +26,7 @@ Routes `*.YOUR_DOMAIN` subdomains to local services over HTTPS via Caddy reverse
    ~/.local/bin/caddy reload --config ~/.config/caddy/Caddyfile --address localhost:2019
    ```
    TLS cert provisioning takes 30–60 seconds (DNS-01 challenge).
-4. **If it connects to OpenClaw Gateway** — add its origin to `allowedOrigins` in `~/.openclaw/openclaw.json`, then restart gateway.
+4. **If it connects to OpenClaw Gateway** — see `OPENCLAW.md` in this folder for gateway-specific config.
 
 ## Quick Dev Servers
 
@@ -57,7 +57,6 @@ systemctl --user restart caddy
 - **Cert not issuing:** `tail -50 /var/log/caddy-error.log | grep -i error` — likely expired Vercel API token
 - **DNS not resolving:** `dig +short appname.YOUR_DOMAIN` — should return your Tailscale IP
 - **TLS error (curl exit 35):** Cert hasn't provisioned yet, wait 30-60s
-- **Gateway "origin not allowed":** Add origin to `gateway.controlUi.allowedOrigins`
-- **Gateway "secure context" error:** Set `gateway.controlUi.allowInsecureAuth: true`
 
-For full reference (example apps, key files, gateway config, build instructions): see `reference.md` in this folder.
+For full reference (example apps, key files, build instructions): see `reference.md`.
+For OpenClaw gateway integration: see `OPENCLAW.md`.
