@@ -68,10 +68,9 @@ For each major angle, generate an **ELK JSON graph** (elkjs format), then **rend
 Use the bundled script to convert ELK JSON → SVG:
 
 ```bash
-# Prerequisite (once, in the skill's scripts dir):
-cd <skill-dir>/scripts && npm install elkjs
+# Prerequisite: elkjs must be installed globally
+# Use whatever package manager is available (npm, bun, pnpm, yarn)
 
-# Render:
 node <skill-dir>/scripts/elk-to-svg.mjs input.json output.svg
 ```
 
