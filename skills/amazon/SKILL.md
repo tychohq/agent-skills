@@ -110,22 +110,22 @@ agent-browser click @[place-order-ref]
 
 **macOS** (opens a visible Chrome window):
 ```bash
-open -na "Google Chrome" --args --user-data-dir=$HOME/.config/chrome-openclaw --no-first-run --remote-debugging-port=9222 https://www.amazon.com
+open -na "Google Chrome" --args --user-data-dir=$HOME/.config/chrome-agent --no-first-run --remote-debugging-port=9222 https://www.amazon.com
 ```
 
 **Linux** (headless with Xvfb/VNC):
 ```bash
-DISPLAY=:99 google-chrome --user-data-dir=$HOME/.config/chrome-openclaw --no-first-run --remote-debugging-port=9222 https://www.amazon.com &
+DISPLAY=:99 google-chrome --user-data-dir=$HOME/.config/chrome-agent --no-first-run --remote-debugging-port=9222 https://www.amazon.com &
 ```
 
 **Linux** (desktop/GUI session):
 ```bash
-google-chrome --user-data-dir=$HOME/.config/chrome-openclaw --no-first-run --remote-debugging-port=9222 https://www.amazon.com &
+google-chrome --user-data-dir=$HOME/.config/chrome-agent --no-first-run --remote-debugging-port=9222 https://www.amazon.com &
 ```
 
 ## Notes
 
-- Browser profile persists login at `$HOME/.config/chrome-openclaw`
+- Browser profile persists login at `$HOME/.config/chrome-agent`
 - On headless Linux, VNC display is typically `:99` on port 5999 (noVNC on 6080)
 - Order confirmations go to the email on your Amazon account
 - CAPTCHAs or 2FA may require manual intervention — if the browser window is visible (macOS or Linux desktop), ask the user to solve it in the Chrome window
