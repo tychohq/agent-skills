@@ -1,37 +1,34 @@
-# Caddy Reverse Proxy — Mac Mini
+# Caddy Reverse Proxy — Reference
 
-Self-hosted reverse proxy on the Mac Mini using Caddy. Routes `*.YOUR_DOMAIN` subdomains to local services over HTTPS. Only accessible on the Tailscale network.
+Self-hosted reverse proxy using Caddy. Routes `*.YOUR_DOMAIN` subdomains to local services over HTTPS. Designed for Tailscale-only access (no public exposure).
 
 ## Quick Reference
 
-- **Binary:** `~/.local/bin/caddy` (custom build with patched `caddy-dns/vercel` for team_id support)
-- **Patched source:** `~/projects/caddy-vercel-patched/`
+- **Binary:** `~/.local/bin/caddy` (custom build with `caddy-dns/vercel` plugin)
 - **Caddyfile:** `~/.config/caddy/Caddyfile`
-- **LaunchDaemon:** `/Library/LaunchDaemons/com.caddyserver.caddy.plist` (system-level, runs as root, KeepAlive)
-- **Ports:** 443 (HTTPS), 80 (HTTP redirect) — runs as root via system LaunchDaemon
+- **Ports:** 443 (HTTPS), 80 (HTTP redirect)
 - **Bound to:** Tailscale IP only (`YOUR_TAILSCALE_IP`)
-- **TLS:** Let's Encrypt via DNS-01 challenge (Vercel DNS API with team_id)
-- **DNS:** `YOUR_DOMAIN` + `*.YOUR_DOMAIN` → A → `YOUR_TAILSCALE_IP`
+- **TLS:** Let's Encrypt via DNS-01 challenge (Vercel DNS API)
+- **DNS:** `YOUR_DOMAIN` + `*.YOUR_DOMAIN` → A record → `YOUR_TAILSCALE_IP`
 
-**macOS port 443 note:** Non-root processes can't bind <1024 on macOS. Must use system LaunchDaemon (runs as root). The plist needs HOME/XDG_DATA_HOME/XDG_CONFIG_HOME env vars so Caddy can find cert storage.
+**Port 443 on macOS:** Non-root processes can't bind ports <1024. Use a system LaunchDaemon (runs as root) with HOME/XDG_DATA_HOME/XDG_CONFIG_HOME env vars so Caddy can find cert storage.
 
-**Rebuild if needed:** `cd ~/projects/caddy-vercel-patched && xcaddy build --with github.com/caddy-dns/vercel=./vercel-patched`
+**Port 443 on Linux:** Grant the capability once: `sudo setcap 'cap_net_bind_service=+ep' ~/.local/bin/caddy` — then a user service works fine.
 
-## Apps
+## Example Apps
 
-| URL | App | Local Port | Repo / Source | LaunchAgent |
-|-----|-----|------------|---------------|-------------|
-| https://YOUR_DOMAIN | Dashboard | — (inline HTML in Caddyfile) | — | — |
-| https://openclaw.YOUR_DOMAIN | OpenClaw Gateway | 18789 | `openclaw` npm package | `ai.openclaw.gateway` |
-| https://crabwalk.YOUR_DOMAIN | Crabwalk Agent Monitor | 3100 | `~/.crabwalk/` | `com.yourusername.crabwalk` |
-| https://webclaw.YOUR_DOMAIN | WebClaw Web Client | 3101 | `~/projects/webclaw/` | `com.yourusername.webclaw` |
-| https://studio.YOUR_DOMAIN | OpenClaw Studio | 3102 | `~/projects/openclaw-studio/` | `com.yourusername.openclaw-studio` |
-| https://openclaw-local.YOUR_DOMAIN | OpenClaw UI Dev Server | 3103 | — | — |
-| https://deck.YOUR_DOMAIN | Deck (Agent Mission Control) | 5200 | `~/projects/deck/` | — (dev server) |
+Adapt this table to your own setup. The pattern: one subdomain per app, each proxied to a local port.
 
-**Port convention:** Gateway on 18789, permanent apps in 3100 range, dev servers at 5200+.
+| URL | App | Local Port | Service |
+|-----|-----|------------|---------|
+| https://YOUR_DOMAIN | Dashboard | — (inline HTML in Caddyfile) | — |
+| https://openclaw.YOUR_DOMAIN | OpenClaw Gateway | 18789 | `ai.openclaw.gateway` |
+| https://myapp.YOUR_DOMAIN | Your Web App | 3100 | `com.yourusername.myapp` |
+| https://api.YOUR_DOMAIN | API Server | 3101 | `com.yourusername.api` |
 
-**Vercel API Token:** Long-lived `vcp_*` token (no expiration, must be revoked if exposed). Stored in the LaunchDaemon plist env vars. If it stops working, create a new one at https://vercel.com/account/tokens (scope: Metagame team). You can push a new token to the live config without sudo via `curl -X POST http://localhost:2019/load` with the token hardcoded in the JSON config.
+**Port convention:** Permanent apps in the 3100 range, dev servers at 5200+ (managed by [dev-serve](https://clawhub.com/skills/dev-serve)).
+
+**Vercel API Token:** Create a long-lived `vcp_*` token at https://vercel.com/account/tokens (no expiration — must be revoked if exposed). On macOS, store it in the LaunchDaemon plist env vars. On Linux, store it in an env file loaded by systemd (see Service Management below). You can push a new token to the live config without restart via `curl -X POST http://localhost:2019/load` with the token in the JSON config.
 
 ## Quick Dev Servers
 
@@ -56,24 +53,28 @@ Phone/Laptop (Tailscale)
 
 ## Key Files
 
-| What | Path |
-|------|------|
-| **Caddyfile** | `~/.config/caddy/Caddyfile` |
-| **Caddy binary** (custom build with patched Vercel DNS plugin) | `~/.local/bin/caddy` |
-| **Caddy LaunchDaemon** | `/Library/LaunchDaemons/com.caddyserver.caddy.plist` |
-| **Caddy patched source** (vercel DNS with team_id support) | `~/projects/caddy-vercel-patched/` |
-| **Vercel API token** (for DNS-01 certs) | In the LaunchDaemon plist env vars |
-| **Caddy logs** | `/var/log/caddy.log` and `/var/log/caddy-error.log` |
-| **DNS records** | Vercel DNS for `YOUR_DOMAIN` |
-| **Gateway config** | `~/.openclaw/openclaw.json` |
-| **Studio settings** | `~/.openclaw/openclaw-studio/settings.json` |
-| **Auto-updater** | `~/Library/LaunchAgents/com.yourusername.mini-apps-update.plist` (daily 5 AM) |
+| What | macOS | Linux |
+|------|-------|-------|
+| **Caddyfile** | `~/.config/caddy/Caddyfile` | `~/.config/caddy/Caddyfile` |
+| **Caddy binary** | `~/.local/bin/caddy` | `~/.local/bin/caddy` |
+| **Caddy service** | `/Library/LaunchDaemons/com.caddyserver.caddy.plist` | `~/.config/systemd/user/caddy.service` |
+| **Vercel API token** | In LaunchDaemon plist env vars | `~/.secrets/vercel/.env` (EnvironmentFile) |
+| **Caddy logs** | `/var/log/caddy.log`, `/var/log/caddy-error.log` | `journalctl --user -u caddy` |
+| **DNS records** | Vercel DNS for `YOUR_DOMAIN` | Vercel DNS for `YOUR_DOMAIN` |
+| **Gateway config** | `~/.openclaw/openclaw.json` | `~/.openclaw/openclaw.json` |
 
 ## How to Add a New App
 
 ### 1. Set up the app as a background process
 
-Clone the repo, install deps, create a LaunchAgent plist. Follow the pattern in `~/Library/LaunchAgents/com.yourusername.webclaw.plist`:
+Clone the repo, install deps, and create a service to keep it running.
+
+Key points for any platform:
+- **Bind to 0.0.0.0** so Caddy can proxy to it. Most frameworks need an explicit flag (Vite: `--host 0.0.0.0`, Next.js custom servers often default to 0.0.0.0).
+- **Pick the next port** in the 3100 range (check the Apps table above).
+- **Use direct binary paths**, not shell wrappers.
+
+#### macOS (LaunchAgent)
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -86,7 +87,6 @@ Clone the repo, install deps, create a LaunchAgent plist. Follow the pattern in 
     <array>
         <string>/opt/homebrew/bin/node</string>
         <string>server/index.js</string>
-        <string>--dev</string>
     </array>
     <key>WorkingDirectory</key>
     <string>~/projects/APPNAME</string>
@@ -111,14 +111,35 @@ Clone the repo, install deps, create a LaunchAgent plist. Follow the pattern in 
 </plist>
 ```
 
-Key points:
-- **Bind to 0.0.0.0** so Caddy can proxy to it. Most frameworks need an explicit flag (Vite: `--host 0.0.0.0`, Next.js custom servers often default to 0.0.0.0).
-- **Pick the next port** in the 3100 range (check the Apps table above).
-- **ProgramArguments** — use the direct binary path, not shell wrappers. For Vite apps use `pnpm dev`, for Next.js use `node server/index.js --dev` or `npx next dev`.
-
-Load it:
 ```bash
 launchctl load ~/Library/LaunchAgents/com.yourusername.APPNAME.plist
+```
+
+#### Linux (systemd user service)
+
+```ini
+# ~/.config/systemd/user/APPNAME.service
+[Unit]
+Description=APPNAME
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/yourusername/projects/APPNAME
+ExecStart=/usr/bin/node server/index.js
+Environment=PORT=31XX
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now APPNAME
+# Ensure services survive logout:
+loginctl enable-linger $(whoami)
 ```
 
 ### 2. Add to Caddyfile
@@ -149,7 +170,7 @@ TLS cert provisioning takes 30–60 seconds for new subdomains (DNS-01 challenge
 
 ### 4. If the app connects to the OpenClaw Gateway
 
-Apps that connect to the gateway (like Studio, WebClaw, openclaw-local) need gateway config:
+Apps that connect to the OpenClaw gateway need additional config:
 
 **a) Add origin to allowedOrigins** in `~/.openclaw/openclaw.json`:
 ```json
@@ -170,7 +191,12 @@ openclaw devices approve <request-id>
 
 **c) Restart the gateway** to pick up config changes:
 ```bash
+# macOS
 launchctl kickstart -k gui/$(id -u)/ai.openclaw.gateway
+# Linux
+systemctl --user restart openclaw-gateway
+# Or:
+openclaw gateway restart
 ```
 
 ## Gateway Config for Caddy Proxying
@@ -184,45 +210,39 @@ The gateway needs specific config in `~/.openclaw/openclaw.json` to work behind 
         "allowInsecureAuth": true,
         "allowedOrigins": [
             "https://openclaw.YOUR_DOMAIN",
-            "https://openclaw-local.YOUR_DOMAIN",
-            "https://studio.YOUR_DOMAIN",
-            "https://webclaw.YOUR_DOMAIN"
+            "https://myapp.YOUR_DOMAIN"
         ]
     }
 }
 ```
 
+Add each app's `https://SUBDOMAIN.YOUR_DOMAIN` origin as needed.
+
 ### Why each setting matters
 
 **`trustedProxies`** — Caddy connects to the gateway from loopback (`::1` / `127.0.0.1`). Without this, the gateway logs `Proxy headers detected from untrusted address` and ignores `X-Forwarded-For`/`X-Forwarded-Proto` headers, treating all connections as non-local. Include `YOUR_TAILSCALE_IP` (Tailscale IP) for any direct Tailscale connections.
 
-**`allowInsecureAuth: true`** — The gateway normally requires device-key authentication (public key signature) for control UI clients. Server-side WebSocket proxies (like Studio's built-in proxy) don't support device auth. This setting allows token-only authentication. Without it, the gateway rejects with the misleading error `control ui requires HTTPS or localhost (secure context)`.
+**`allowInsecureAuth: true`** — The gateway normally requires device-key authentication (public key signature) for control UI clients. Server-side WebSocket proxies don't support device auth. This setting allows token-only authentication. Without it, the gateway rejects with the misleading error `control ui requires HTTPS or localhost (secure context)`.
 
 **`allowedOrigins`** — The gateway checks the `Origin` header on WebSocket upgrades for control UI and webchat clients. Any UI served from a different subdomain than the gateway itself needs its origin listed here. Without it: `origin not allowed`.
 
-## OpenClaw Studio Specifics
-
-Studio has a **built-in WebSocket proxy** (`/api/gateway/ws`). The browser connects to Studio, and Studio's server proxies to the upstream gateway. This means:
-
-- The **upstream URL** in `~/.openclaw/openclaw-studio/settings.json` should be `wss://openclaw.YOUR_DOMAIN` (through Caddy, so the proxy's origin is HTTPS).
-- The Studio auto-discovers the gateway token from `~/.openclaw/openclaw.json` — no need to set env vars.
-- Direct `ws://localhost:18789` does NOT work as the upstream URL because the gateway's secure context check rejects the `http://localhost:18789` origin from the Node.js WebSocket client.
-- The Studio's `npm run dev` runs a custom server (`node server/index.js --dev`), not `next dev` directly. Port is set via `PORT` env var, host defaults to `0.0.0.0`.
-
 ## Custom Caddy Build
 
-The standard `caddy-dns/vercel` plugin doesn't support Vercel team accounts (missing `teamId` query parameter). A patched version was built that adds `team_id` support.
+You need Caddy built with the `caddy-dns/vercel` plugin. If you use a **personal** Vercel account (no team), the upstream plugin works as-is:
 
-**To rebuild Caddy** (e.g., after updating):
 ```bash
-cd ~/projects/caddy-vercel-patched
-xcaddy build --with github.com/caddy-dns/vercel=./vercel-patched
+# Install xcaddy: https://github.com/caddyserver/xcaddy
+xcaddy build --with github.com/caddy-dns/vercel
 cp caddy ~/.local/bin/caddy
 ```
 
+If you use a **Vercel team account**, the upstream plugin doesn't pass `teamId` in API calls (as of Feb 2026). You'll need to either:
+1. Fork and patch `caddy-dns/vercel` to add `team_id` support, or
+2. Use the `--with github.com/caddy-dns/vercel=./your-patched-version` flag with xcaddy
+
 ## Service Management
 
-Caddy runs as a system LaunchDaemon (needs root for port 443).
+### macOS (LaunchDaemon — needs root for port 443)
 
 ```bash
 # Check status
@@ -241,6 +261,57 @@ sudo launchctl load /Library/LaunchDaemons/com.caddyserver.caddy.plist
 
 **Note:** `sudo launchctl bootstrap system /Library/LaunchDaemons/...` can fail with `Input/output error` if the service is already loaded. Use `unload`/`load` as a more reliable alternative.
 
+### Linux (systemd user service)
+
+On Linux, Caddy can run as a user service (no root needed if binding to ports ≥1024, or if using `setcap`):
+
+```bash
+# Grant Caddy permission to bind low ports (once)
+sudo setcap 'cap_net_bind_service=+ep' ~/.local/bin/caddy
+
+# Service file: ~/.config/systemd/user/caddy.service
+```
+
+```ini
+[Unit]
+Description=Caddy Reverse Proxy
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.secrets/vercel/.env
+ExecStart=%h/.local/bin/caddy run --config %h/.config/caddy/Caddyfile
+ExecReload=%h/.local/bin/caddy reload --config %h/.config/caddy/Caddyfile
+Restart=always
+RestartSec=5
+Environment=XDG_DATA_HOME=%h/.local/share
+Environment=XDG_CONFIG_HOME=%h/.config
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now caddy
+
+# Ensure Caddy survives logout
+loginctl enable-linger $(whoami)
+
+# Check status / logs
+systemctl --user status caddy
+journalctl --user -u caddy -f
+
+# Reload config
+~/.local/bin/caddy reload --config ~/.config/caddy/Caddyfile
+```
+
+**Secrets:** Store your Vercel API token and team ID in an env file (e.g., `~/.secrets/vercel/.env`):
+```bash
+VERCEL_API_TOKEN=vcp_your_token_here
+VERCEL_TEAM_ID=team_your_id_here
+```
+
 ## How HTTPS Works
 
 Custom Caddy build with patched `vercel` DNS provider:
@@ -250,14 +321,17 @@ Custom Caddy build with patched `vercel` DNS provider:
 
 Works without public access — DNS-01 doesn't need inbound HTTP.
 
-Vercel API token is stored in the Caddy LaunchDaemon plist env vars. If expired, certs fail with `No TXT record found at _acme-challenge...`. Regenerate at Vercel dashboard and update the plist.
+Vercel API token is stored in the Caddy service env vars (plist on macOS, EnvironmentFile on Linux). If expired, certs fail with `No TXT record found at _acme-challenge...`. Regenerate at Vercel dashboard and update the service config.
 
 ## Troubleshooting
 
 **Cert not issuing:**
 ```bash
+# macOS
 tail -50 /var/log/caddy-error.log | grep -i error
-# Common: expired Vercel API token → update in LaunchDaemon plist, restart Caddy
+# Linux
+journalctl --user -u caddy --since "1 hour ago" | grep -i error
+# Common: expired Vercel API token → update token, restart Caddy
 ```
 
 **DNS not resolving:**
@@ -285,11 +359,8 @@ openclaw devices list
 openclaw devices approve <request-id>
 ```
 
-**Studio: "upstream closed" or 502:**
-Check `~/Library/Logs/openclaw-studio-error.log`. Common causes:
-- Upstream URL pointing to itself instead of the gateway
-- Gateway not running
-- Gateway rejecting the proxy's WebSocket connection (see errors above)
-
-**WebClaw auto-update conflict:**
-WebClaw has a local-only `allowedHosts` patch in `vite.config.ts`. The daily auto-updater stashes it on pull. If `pnpm-lock.yaml` also has local diffs, stash pop fails. The updater handles this with a sed fallback.
+**App showing 502:**
+Check the app's logs. Common causes:
+- App not running or crashed
+- App bound to `127.0.0.1` instead of `0.0.0.0`
+- Wrong port in Caddyfile

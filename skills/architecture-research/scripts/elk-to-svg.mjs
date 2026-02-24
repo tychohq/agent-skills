@@ -6,11 +6,18 @@
  *   node elk-to-svg.mjs input.json [output.svg]
  *   cat input.json | node elk-to-svg.mjs > output.svg
  *
- * Requires: elkjs (npm install elkjs)
+ * Requires: npm install -g elkjs  (or install locally where you run this)
  */
 
-import ELK from "elkjs";
 import { readFileSync, writeFileSync } from "fs";
+
+let ELK;
+try {
+  ELK = (await import("elkjs")).default;
+} catch {
+  console.error("Error: elkjs not found. Install it: npm install -g elkjs");
+  process.exit(1);
+}
 
 const elk = new ELK();
 
@@ -54,14 +61,12 @@ function renderNodes(nodes, offsetX = 0, offsetY = 0) {
     const y = (node.y || 0) + offsetY;
     const w = node.width || 120;
     const h = node.height || 50;
-    const label =
-      node.labels?.[0]?.text || node.id;
+    const label = node.labels?.[0]?.text || node.id;
     const isGroup = node.children && node.children.length > 0;
 
     svgBody += `  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${NODE_RX}" `;
     svgBody += `fill="${isGroup ? GROUP_FILL : NODE_FILL}" stroke="${isGroup ? GROUP_STROKE : NODE_STROKE}" stroke-width="1.5"/>\n`;
 
-    // Label at top of node
     const labelY = isGroup ? y + 18 : y + h / 2 + FONT_SIZE / 3;
     const labelX = x + w / 2;
     svgBody += `  <text x="${labelX}" y="${labelY}" text-anchor="middle" `;
@@ -84,7 +89,6 @@ function renderEdges(edges, nodes, offsetX = 0, offsetY = 0) {
         .join(" ");
       svgBody += `  <path d="${d}" fill="none" stroke="${EDGE_COLOR}" stroke-width="1.5" marker-end="url(#arrow)"/>\n`;
 
-      // Edge label
       if (edge.labels?.[0]?.text) {
         const mid = points[Math.floor(points.length / 2)];
         svgBody += `  <text x="${(mid.x || 0) + offsetX}" y="${(mid.y || 0) + offsetY - 5}" `;
@@ -94,7 +98,6 @@ function renderEdges(edges, nodes, offsetX = 0, offsetY = 0) {
     }
   }
 
-  // Recurse into groups
   for (const node of nodes || []) {
     if (node.children) {
       renderEdges(
@@ -121,7 +124,6 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="$
   </defs>
 ${svgBody}</svg>`;
 
-// --- Write output ---
 if (process.argv[3]) {
   writeFileSync(process.argv[3], svg);
   console.error(`Wrote ${process.argv[3]}`);

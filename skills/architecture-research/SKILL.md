@@ -68,15 +68,18 @@ For each major angle, generate an **ELK JSON graph** (elkjs format), then **rend
 Use the bundled script to convert ELK JSON → SVG:
 
 ```bash
-# From the skill's scripts/ directory:
-SKILL_DIR="$(dirname "$(realpath "$0")")/../skills/architecture-research/scripts"
-# Or use the absolute path:
-node ~/.openclaw/workspace/skills/architecture-research/scripts/elk-to-svg.mjs input.json output.svg
+# Prerequisite (once, in the skill's scripts dir):
+cd <skill-dir>/scripts && npm install elkjs
+
+# Render:
+node <skill-dir>/scripts/elk-to-svg.mjs input.json output.svg
 ```
+
+Replace `<skill-dir>` with the actual path to this skill's directory (e.g., the parent of this SKILL.md file).
 
 **Workflow for each diagram:**
 1. Write the ELK JSON to a `.json` file in the research folder
-2. Render: `node <skill>/scripts/elk-to-svg.mjs diagram.json diagram.svg`
+2. Render: `node <skill-dir>/scripts/elk-to-svg.mjs diagram.json diagram.svg`
 3. Embed in the markdown doc: `![System Overview](system-overview.svg)`
 4. Keep both the `.json` (source of truth) and `.svg` (rendered) in the research folder
 
@@ -92,12 +95,14 @@ node ~/.openclaw/workspace/skills/architecture-research/scripts/elk-to-svg.mjs i
 Create a research folder and markdown doc:
 
 ```
-~/.openclaw/workspace/research/<repo-slug>-architecture/
+<output-dir>/<repo-slug>-architecture/
 ├── prompt.md          # Original question
 ├── architecture.md    # The deliverable
 ├── *.json             # ELK JSON source files (editable)
 └── *.svg              # Rendered SVG diagrams (embedded in architecture.md)
 ```
+
+Place output wherever makes sense for your workspace (e.g., a `research/` directory).
 
 **architecture.md** format:
 
