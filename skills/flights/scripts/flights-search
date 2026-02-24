@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""Search flights via Google Flights using the fast-flights library."""
+
+import argparse
+import sys
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Search flights via Google Flights data",
+        epilog="Examples:\n"
+        "  flights-search EWR LAX 2026-03-15\n"
+        "  flights-search JFK LHR 2026-03-15 --nonstop --class business\n"
+        "  flights-search EWR BER 2026-03-15 --after 17 --before 22\n"
+        "  flights-search LAX NRT 2026-03-15 --passengers 2 --link",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("origin", help="Departure airport IATA code (e.g., JFK)")
+    parser.add_argument("destination", help="Arrival airport IATA code (e.g., LAX)")
+    parser.add_argument("date", help="Travel date (YYYY-MM-DD)")
+    parser.add_argument(
+        "--nonstop", action="store_true", help="Nonstop flights only"
+    )
+    parser.add_argument(
+        "--all-stops",
+        action="store_true",
+        help="Show all flights regardless of stops (default: show fewest stops available)",
+    )
+    parser.add_argument(
+        "--after", type=int, metavar="HH", help="Depart after hour (24h format)"
+    )
+    parser.add_argument(
+        "--before", type=int, metavar="HH", help="Depart before hour (24h format)"
+    )
+    parser.add_argument(
+        "--class",
+        dest="cabin",
+        default="economy",
+        choices=["economy", "premium", "business", "first"],
+        help="Cabin class (default: economy)",
+    )
+    parser.add_argument(
+        "--passengers", type=int, default=1, help="Number of travelers (default: 1)"
+    )
+    parser.add_argument(
+        "--link", action="store_true", help="Print Google Flights booking URL"
+    )
+    args = parser.parse_args()
+
+    try:
+        from fast_flights import FlightData, Passengers, get_flights
+    except ImportError:
+        print(
+            "Error: fast-flights not installed. Run: pip install fast-flights",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    seat_map = {
+        "economy": "economy",
+        "premium": "premium-economy",
+        "business": "business",
+        "first": "first",
+    }
+
+    max_stops = 0 if args.nonstop else None
+
+    fd = FlightData(
+        date=args.date,
+        from_airport=args.origin.upper(),
+        to_airport=args.destination.upper(),
+        **({"max_stops": max_stops} if max_stops is not None else {}),
+    )
+
+    try:
+        result = get_flights(
+            flight_data=[fd],
+            trip="one-way",
+            passengers=Passengers(adults=args.passengers),
+            seat=seat_map[args.cabin],
+        )
+    except Exception as e:
+        msg = str(e)
+        if "No flights found" in msg or len(msg) > 500:
+            print("No flights found for this route/date/filter combination.")
+            sys.exit(0)
+        raise
+
+    flights = result.flights
+    if not flights:
+        print("No flights found.")
+        sys.exit(0)
+
+    # Filter by departure time if requested
+    if args.after or args.before:
+        filtered = []
+        for f in flights:
+            try:
+                # Parse hour from departure string like "6:00 PM on Sat, Mar 7"
+                time_part = f.departure.split(" on ")[0].strip()
+                hour, minute_ampm = time_part.split(":")
+                hour = int(hour)
+                minute_ampm = minute_ampm.strip()
+                if "PM" in minute_ampm.upper() and hour != 12:
+                    hour += 12
+                elif "AM" in minute_ampm.upper() and hour == 12:
+                    hour = 0
+
+                if args.after and hour < args.after:
+                    continue
+                if args.before and hour >= args.before:
+                    continue
+                filtered.append(f)
+            except (ValueError, IndexError):
+                filtered.append(f)  # Keep if we can't parse
+        flights = filtered
+
+    if not flights:
+        print("No flights match the time filters.")
+        sys.exit(0)
+
+    # Find minimum stops unless --all-stops
+    if not args.all_stops and not args.nonstop:
+        stop_counts = []
+        for f in flights:
+            stops = getattr(f, "stops", None)
+            if stops is not None:
+                try:
+                    stop_counts.append(int(stops) if str(stops).isdigit() else 0)
+                except (ValueError, TypeError):
+                    stop_counts.append(0)
+            else:
+                stop_counts.append(0)
+        if stop_counts:
+            min_stops = min(stop_counts)
+            flights = [
+                f
+                for f, s in zip(flights, stop_counts)
+                if s == min_stops
+            ]
+
+    # Print results
+    header = f"{'Depart':<30} {'Arrive':<30} {'Airline':<16} {'Price':<11} {'Duration'}"
+    print(header)
+    print("-" * len(header))
+
+    for f in flights:
+        dep = getattr(f, "departure", "?")
+        arr = getattr(f, "arrival", "?")
+        airline = getattr(f, "name", getattr(f, "airline", "?"))
+        price = getattr(f, "price", "?")
+        duration = getattr(f, "duration", "?")
+        print(f"{dep:<30} {arr:<30} {airline:<16} {price:<11} {duration}")
+
+    stop_label = "nonstop" if args.nonstop or (not args.all_stops) else ""
+    print(f"\n{len(flights)} {stop_label} flight(s) found.".strip())
+
+    if args.link:
+        origin = args.origin.upper()
+        dest = args.destination.upper()
+        date = args.date
+        cabin_map = {"economy": "1", "premium": "2", "business": "3", "first": "4"}
+        cabin_code = cabin_map.get(args.cabin, "1")
+        url = (
+            f"https://www.google.com/travel/flights?q=Flights%20from%20"
+            f"{origin}%20to%20{dest}%20on%20{date}&curr=USD&tfs=CAEQAhoo"
+            f"&tfu=CgYIARABGAE&hl=en&gl=us&curr=USD"
+        )
+        print(f"\nGoogle Flights: {url}")
+
+
+if __name__ == "__main__":
+    main()
