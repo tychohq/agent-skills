@@ -1,3 +1,8 @@
+---
+name: vercel-speed-audit
+description: Optimize Vercel build and deploy speed — audit checklist for new and existing projects.
+---
+
 # Vercel Speed Audit Skill
 
 Optimize Vercel build and deploy speed for any project. Run as a checklist when starting new projects or auditing existing ones.
