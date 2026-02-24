@@ -20,7 +20,16 @@ if [[ ! -f "$AUTH_FILE" ]]; then
   exit 1
 fi
 VERCEL_TOKEN=$(jq -r '.token' "$AUTH_FILE")
-TEAM="YOUR_VERCEL_TEAM_ID"
+
+# Team ID: env var > Vercel CLI config > none (personal account)
+if [[ -n "${VERCEL_TEAM_ID:-}" ]]; then
+  TEAM="$VERCEL_TEAM_ID"
+elif command -v jq &>/dev/null && [[ -f "$HOME/.local/share/com.vercel.cli/config.json" ]]; then
+  TEAM=$(jq -r '.currentTeam // empty' "$HOME/.local/share/com.vercel.cli/config.json")
+else
+  TEAM=""
+fi
+TEAM_PARAM="${TEAM:+?teamId=$TEAM}"
 
 echo "Checking: $DOMAIN"
 echo "-----------------------------------------------------------"
@@ -31,7 +40,7 @@ IFS=',' read -ra TLD_ARRAY <<< "$TLDS"
 for tld in "${TLD_ARRAY[@]}"; do
   FULL_DOMAIN="${DOMAIN}.${tld}"
   
-  result=$(curl -s "https://api.vercel.com/v1/registrar/domains/${FULL_DOMAIN}/price?teamId=${TEAM}" \
+  result=$(curl -s "https://api.vercel.com/v1/registrar/domains/${FULL_DOMAIN}/price${TEAM_PARAM}" \
     -H "Authorization: Bearer ${VERCEL_TOKEN}" 2>&1)
   
   buy=$(echo "$result" | jq -r '.purchasePrice // empty')

@@ -43,7 +43,7 @@ dev-serve down myapp              # clean up when done
 dev-serve ls                      # list active dev servers
 ```
 
-See `skills/dev-serve/SKILL.md` for full docs. Starts a tmux session, adds a Caddy route, reloads — one command.
+Companion skill: [dev-serve](https://clawhub.com/skills/dev-serve). Starts a tmux session, adds a Caddy route, reloads — one command.
 
 ## Architecture
 
