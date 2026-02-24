@@ -1,22 +1,366 @@
 #!/usr/bin/env python3
-"""Search flights via Google Flights using the fast-flights library."""
+"""Search flights via Google Flights using the fast-flights library.
+
+Supports city names (NYC, London, Tokyo) that auto-expand to all nearby airports.
+"""
 
 import argparse
 import sys
 
+# Metro area → associated names (cities, IATA codes, neighborhoods, airport names)
+# Derived from knowhere/src/utils/metro-areas.ts
+METRO_AREAS = {
+    "New York": {
+        "aliases": [
+            "new york", "nyc", "manhattan", "brooklyn", "queens",
+            "bronx", "the bronx", "staten island", "newark",
+            "laguardia", "la guardia",
+        ],
+        "airports": ["JFK", "EWR", "LGA"],
+    },
+    "San Francisco Bay Area": {
+        "aliases": [
+            "san francisco", "sf", "bay area", "oakland", "san jose",
+        ],
+        "airports": ["SFO", "OAK", "SJC"],
+    },
+    "Los Angeles": {
+        "aliases": [
+            "los angeles", "la", "burbank", "long beach",
+            "ontario", "santa ana", "john wayne",
+        ],
+        "airports": ["LAX", "BUR", "LGB", "ONT", "SNA"],
+    },
+    "Chicago": {
+        "aliases": ["chicago", "midway"],
+        "airports": ["ORD", "MDW"],
+    },
+    "Washington DC": {
+        "aliases": [
+            "washington", "dc", "washington dc", "dulles",
+            "baltimore", "reagan",
+        ],
+        "airports": ["DCA", "IAD", "BWI"],
+    },
+    "Dallas": {
+        "aliases": ["dallas", "dfw", "fort worth", "love field"],
+        "airports": ["DFW", "DAL"],
+    },
+    "Houston": {
+        "aliases": ["houston", "hobby", "bush"],
+        "airports": ["IAH", "HOU"],
+    },
+    "Miami": {
+        "aliases": ["miami", "fort lauderdale"],
+        "airports": ["MIA", "FLL"],
+    },
+    "Boston": {
+        "aliases": ["boston"],
+        "airports": ["BOS"],
+    },
+    "Seattle": {
+        "aliases": ["seattle"],
+        "airports": ["SEA"],
+    },
+    "Denver": {
+        "aliases": ["denver"],
+        "airports": ["DEN"],
+    },
+    "Atlanta": {
+        "aliases": ["atlanta"],
+        "airports": ["ATL"],
+    },
+    "Detroit": {
+        "aliases": ["detroit"],
+        "airports": ["DTW"],
+    },
+    "Minneapolis": {
+        "aliases": ["minneapolis"],
+        "airports": ["MSP"],
+    },
+    "Phoenix": {
+        "aliases": ["phoenix"],
+        "airports": ["PHX"],
+    },
+    "Philadelphia": {
+        "aliases": ["philadelphia", "philly"],
+        "airports": ["PHL"],
+    },
+    "Toronto": {
+        "aliases": ["toronto", "pearson", "billy bishop"],
+        "airports": ["YYZ", "YTZ"],
+    },
+    "Montreal": {
+        "aliases": ["montreal", "trudeau"],
+        "airports": ["YUL"],
+    },
+    "Vancouver": {
+        "aliases": ["vancouver"],
+        "airports": ["YVR"],
+    },
+    "London": {
+        "aliases": [
+            "london", "heathrow", "gatwick", "stansted",
+            "luton", "city airport",
+        ],
+        "airports": ["LHR", "LGW", "STN", "LTN", "LCY"],
+    },
+    "Paris": {
+        "aliases": ["paris", "orly", "charles de gaulle"],
+        "airports": ["CDG", "ORY"],
+    },
+    "Berlin": {
+        "aliases": ["berlin"],
+        "airports": ["BER"],
+    },
+    "Frankfurt": {
+        "aliases": ["frankfurt"],
+        "airports": ["FRA"],
+    },
+    "Munich": {
+        "aliases": ["munich"],
+        "airports": ["MUC"],
+    },
+    "Amsterdam": {
+        "aliases": ["amsterdam", "schiphol"],
+        "airports": ["AMS"],
+    },
+    "Rome": {
+        "aliases": ["rome", "roma", "fiumicino", "ciampino"],
+        "airports": ["FCO", "CIA"],
+    },
+    "Milan": {
+        "aliases": ["milan", "milano", "malpensa", "linate"],
+        "airports": ["MXP", "LIN"],
+    },
+    "Madrid": {
+        "aliases": ["madrid"],
+        "airports": ["MAD"],
+    },
+    "Barcelona": {
+        "aliases": ["barcelona"],
+        "airports": ["BCN"],
+    },
+    "Lisbon": {
+        "aliases": ["lisbon"],
+        "airports": ["LIS"],
+    },
+    "Zurich": {
+        "aliases": ["zurich"],
+        "airports": ["ZRH"],
+    },
+    "Vienna": {
+        "aliases": ["vienna"],
+        "airports": ["VIE"],
+    },
+    "Dublin": {
+        "aliases": ["dublin"],
+        "airports": ["DUB"],
+    },
+    "Copenhagen": {
+        "aliases": ["copenhagen"],
+        "airports": ["CPH"],
+    },
+    "Stockholm": {
+        "aliases": ["stockholm", "arlanda", "bromma"],
+        "airports": ["ARN", "BMA"],
+    },
+    "Oslo": {
+        "aliases": ["oslo"],
+        "airports": ["OSL"],
+    },
+    "Istanbul": {
+        "aliases": ["istanbul", "sabiha"],
+        "airports": ["IST", "SAW"],
+    },
+    "Tokyo": {
+        "aliases": ["tokyo", "narita", "haneda"],
+        "airports": ["NRT", "HND"],
+    },
+    "Osaka": {
+        "aliases": ["osaka"],
+        "airports": ["KIX", "ITM"],
+    },
+    "Seoul": {
+        "aliases": ["seoul", "incheon", "gimpo"],
+        "airports": ["ICN", "GMP"],
+    },
+    "Beijing": {
+        "aliases": ["beijing", "daxing"],
+        "airports": ["PEK", "PKX"],
+    },
+    "Shanghai": {
+        "aliases": ["shanghai", "pudong", "hongqiao"],
+        "airports": ["PVG", "SHA"],
+    },
+    "Hong Kong": {
+        "aliases": ["hong kong"],
+        "airports": ["HKG"],
+    },
+    "Singapore": {
+        "aliases": ["singapore"],
+        "airports": ["SIN"],
+    },
+    "Bangkok": {
+        "aliases": ["bangkok"],
+        "airports": ["BKK", "DMK"],
+    },
+    "Taipei": {
+        "aliases": ["taipei"],
+        "airports": ["TPE"],
+    },
+    "Mumbai": {
+        "aliases": ["mumbai", "bombay"],
+        "airports": ["BOM"],
+    },
+    "Delhi": {
+        "aliases": ["delhi", "new delhi"],
+        "airports": ["DEL"],
+    },
+    "Dubai": {
+        "aliases": ["dubai"],
+        "airports": ["DXB", "DWC"],
+    },
+    "Tel Aviv": {
+        "aliases": ["tel aviv"],
+        "airports": ["TLV"],
+    },
+    "Sydney": {
+        "aliases": ["sydney"],
+        "airports": ["SYD"],
+    },
+    "Melbourne": {
+        "aliases": ["melbourne"],
+        "airports": ["MEL"],
+    },
+    "São Paulo": {
+        "aliases": ["sao paulo", "são paulo", "guarulhos", "congonhas"],
+        "airports": ["GRU", "CGH"],
+    },
+    "Buenos Aires": {
+        "aliases": ["buenos aires"],
+        "airports": ["EZE", "AEP"],
+    },
+    "Rio de Janeiro": {
+        "aliases": ["rio", "rio de janeiro"],
+        "airports": ["GIG", "SDU"],
+    },
+    "Mexico City": {
+        "aliases": ["mexico city"],
+        "airports": ["MEX"],
+    },
+    "Bogota": {
+        "aliases": ["bogota"],
+        "airports": ["BOG"],
+    },
+    "Lima": {
+        "aliases": ["lima"],
+        "airports": ["LIM"],
+    },
+    "Cairo": {
+        "aliases": ["cairo"],
+        "airports": ["CAI"],
+    },
+    "Johannesburg": {
+        "aliases": ["johannesburg"],
+        "airports": ["JNB"],
+    },
+    "Nairobi": {
+        "aliases": ["nairobi"],
+        "airports": ["NBO"],
+    },
+}
+
+# Build lookup: lowercase alias/IATA → list of IATA codes
+_LOOKUP = {}
+for _metro, _info in METRO_AREAS.items():
+    codes = _info["airports"]
+    _LOOKUP[_metro.lower()] = codes
+    for alias in _info["aliases"]:
+        _LOOKUP[alias.lower()] = codes
+    for code in codes:
+        _LOOKUP[code.lower()] = codes
+
+
+def resolve_airports(code_or_city):
+    """Resolve a city name or IATA code to a list of airport codes."""
+    key = code_or_city.strip().lower()
+    if key in _LOOKUP:
+        return _LOOKUP[key]
+    # Assume it's an IATA code not in our map
+    return [code_or_city.strip().upper()]
+
+
+def parse_departure_hour(departure_str):
+    """Parse hour from departure string like '6:00 PM on Sat, Mar 7'."""
+    try:
+        time_part = departure_str.split(" on ")[0].strip()
+        hour_str, rest = time_part.split(":")
+        hour = int(hour_str)
+        if "PM" in rest.upper() and hour != 12:
+            hour += 12
+        elif "AM" in rest.upper() and hour == 12:
+            hour = 0
+        return hour
+    except (ValueError, IndexError):
+        return None
+
+
+def search_flights(origin, destination, date, cabin, passengers, nonstop):
+    """Search flights for a single origin→destination pair."""
+    from fast_flights import FlightData, Passengers as Pax, get_flights
+
+    seat_map = {
+        "economy": "economy",
+        "premium": "premium-economy",
+        "business": "business",
+        "first": "first",
+    }
+
+    kwargs = {}
+    if nonstop:
+        kwargs["max_stops"] = 0
+
+    fd = FlightData(
+        date=date,
+        from_airport=origin,
+        to_airport=destination,
+        **kwargs,
+    )
+
+    try:
+        result = get_flights(
+            flight_data=[fd],
+            trip="one-way",
+            passengers=Pax(adults=passengers),
+            seat=seat_map[cabin],
+        )
+        return result.flights or []
+    except Exception as e:
+        msg = str(e)
+        if "No flights found" in msg or len(msg) > 500:
+            return []
+        raise
+
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Search flights via Google Flights data",
+        description="Search flights via Google Flights. Supports city names (NYC, London, Tokyo) and IATA codes.",
         epilog="Examples:\n"
-        "  flights-search EWR LAX 2026-03-15\n"
-        "  flights-search JFK LHR 2026-03-15 --nonstop --class business\n"
-        "  flights-search EWR BER 2026-03-15 --after 17 --before 22\n"
-        "  flights-search LAX NRT 2026-03-15 --passengers 2 --link",
+        "  flights-search NYC LAX 2026-03-15\n"
+        "  flights-search NYC Berlin 2026-03-15 --nonstop\n"
+        "  flights-search London Tokyo 2026-04-01 --class business\n"
+        "  flights-search JFK LHR 2026-03-15 --after 17 --before 22",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("origin", help="Departure airport IATA code (e.g., JFK)")
-    parser.add_argument("destination", help="Arrival airport IATA code (e.g., LAX)")
+    parser.add_argument(
+        "origin",
+        help="Departure airport IATA code or city name (e.g., JFK, NYC, London)",
+    )
+    parser.add_argument(
+        "destination",
+        help="Arrival airport IATA code or city name (e.g., LAX, Tokyo, Berlin)",
+    )
     parser.add_argument("date", help="Travel date (YYYY-MM-DD)")
     parser.add_argument(
         "--nonstop", action="store_true", help="Nonstop flights only"
@@ -48,7 +392,7 @@ def main():
     args = parser.parse_args()
 
     try:
-        from fast_flights import FlightData, Passengers, get_flights
+        import fast_flights  # noqa: F401
     except ImportError:
         print(
             "Error: fast-flights not installed. Run: pip install fast-flights",
@@ -56,73 +400,61 @@ def main():
         )
         sys.exit(1)
 
-    seat_map = {
-        "economy": "economy",
-        "premium": "premium-economy",
-        "business": "business",
-        "first": "first",
-    }
+    origins = resolve_airports(args.origin)
+    destinations = resolve_airports(args.destination)
 
-    max_stops = 0 if args.nonstop else None
+    multi_origin = len(origins) > 1
+    multi_dest = len(destinations) > 1
 
-    fd = FlightData(
-        date=args.date,
-        from_airport=args.origin.upper(),
-        to_airport=args.destination.upper(),
-        **({"max_stops": max_stops} if max_stops is not None else {}),
-    )
+    if multi_origin:
+        print(f"Searching from {args.origin}: {', '.join(origins)}")
+    if multi_dest:
+        print(f"Searching to {args.destination}: {', '.join(destinations)}")
+    if multi_origin or multi_dest:
+        print()
 
-    try:
-        result = get_flights(
-            flight_data=[fd],
-            trip="one-way",
-            passengers=Passengers(adults=args.passengers),
-            seat=seat_map[args.cabin],
-        )
-    except Exception as e:
-        msg = str(e)
-        if "No flights found" in msg or len(msg) > 500:
-            print("No flights found for this route/date/filter combination.")
-            sys.exit(0)
-        raise
+    all_flights = []
 
-    flights = result.flights
-    if not flights:
+    for orig in origins:
+        for dest in destinations:
+            if orig == dest:
+                continue
+            try:
+                flights = search_flights(
+                    orig, dest, args.date, args.cabin, args.passengers, args.nonstop
+                )
+                for f in flights:
+                    all_flights.append((orig, dest, f))
+            except Exception as e:
+                print(f"  {orig} → {dest}: Error - {e}", file=sys.stderr)
+
+    if not all_flights:
         print("No flights found.")
         sys.exit(0)
 
-    # Filter by departure time if requested
+    # Filter by departure time
     if args.after or args.before:
         filtered = []
-        for f in flights:
-            try:
-                # Parse hour from departure string like "6:00 PM on Sat, Mar 7"
-                time_part = f.departure.split(" on ")[0].strip()
-                hour, minute_ampm = time_part.split(":")
-                hour = int(hour)
-                minute_ampm = minute_ampm.strip()
-                if "PM" in minute_ampm.upper() and hour != 12:
-                    hour += 12
-                elif "AM" in minute_ampm.upper() and hour == 12:
-                    hour = 0
+        for orig, dest, f in all_flights:
+            hour = parse_departure_hour(getattr(f, "departure", ""))
+            if hour is None:
+                filtered.append((orig, dest, f))
+                continue
+            if args.after and hour < args.after:
+                continue
+            if args.before and hour >= args.before:
+                continue
+            filtered.append((orig, dest, f))
+        all_flights = filtered
 
-                if args.after and hour < args.after:
-                    continue
-                if args.before and hour >= args.before:
-                    continue
-                filtered.append(f)
-            except (ValueError, IndexError):
-                filtered.append(f)  # Keep if we can't parse
-        flights = filtered
-
-    if not flights:
+    if not all_flights:
         print("No flights match the time filters.")
         sys.exit(0)
 
     # Find minimum stops unless --all-stops
     if not args.all_stops and not args.nonstop:
         stop_counts = []
-        for f in flights:
+        for _, _, f in all_flights:
             stops = getattr(f, "stops", None)
             if stops is not None:
                 try:
@@ -133,40 +465,64 @@ def main():
                 stop_counts.append(0)
         if stop_counts:
             min_stops = min(stop_counts)
-            flights = [
-                f
-                for f, s in zip(flights, stop_counts)
+            all_flights = [
+                (o, d, f)
+                for (o, d, f), s in zip(all_flights, stop_counts)
                 if s == min_stops
             ]
 
+    # Deduplicate (same departure + arrival + airline + price)
+    seen = set()
+    unique_flights = []
+    for orig, dest, f in all_flights:
+        key = (
+            getattr(f, "departure", ""),
+            getattr(f, "arrival", ""),
+            getattr(f, "name", ""),
+            getattr(f, "price", ""),
+        )
+        if key not in seen:
+            seen.add(key)
+            unique_flights.append((orig, dest, f))
+    all_flights = unique_flights
+
+    # Sort by departure time
+    def sort_key(item):
+        hour = parse_departure_hour(getattr(item[2], "departure", ""))
+        return hour if hour is not None else 99
+
+    all_flights.sort(key=sort_key)
+
     # Print results
-    header = f"{'Depart':<30} {'Arrive':<30} {'Airline':<16} {'Price':<11} {'Duration'}"
+    show_route = multi_origin or multi_dest
+    if show_route:
+        header = f"{'Route':<12} {'Depart':<28} {'Arrive':<28} {'Airline':<16} {'Price':<11} {'Duration'}"
+    else:
+        header = f"{'Depart':<28} {'Arrive':<28} {'Airline':<16} {'Price':<11} {'Duration'}"
     print(header)
     print("-" * len(header))
 
-    for f in flights:
+    for orig, dest, f in all_flights:
         dep = getattr(f, "departure", "?")
         arr = getattr(f, "arrival", "?")
         airline = getattr(f, "name", getattr(f, "airline", "?"))
         price = getattr(f, "price", "?")
         duration = getattr(f, "duration", "?")
-        print(f"{dep:<30} {arr:<30} {airline:<16} {price:<11} {duration}")
+        if show_route:
+            route = f"{orig}→{dest}"
+            print(f"{route:<12} {dep:<28} {arr:<28} {airline:<16} {price:<11} {duration}")
+        else:
+            print(f"{dep:<28} {arr:<28} {airline:<16} {price:<11} {duration}")
 
-    stop_label = "nonstop" if args.nonstop or (not args.all_stops) else ""
-    print(f"\n{len(flights)} {stop_label} flight(s) found.".strip())
+    print(f"\n{len(all_flights)} flight(s) found.")
 
     if args.link:
-        origin = args.origin.upper()
-        dest = args.destination.upper()
-        date = args.date
-        cabin_map = {"economy": "1", "premium": "2", "business": "3", "first": "4"}
-        cabin_code = cabin_map.get(args.cabin, "1")
-        url = (
-            f"https://www.google.com/travel/flights?q=Flights%20from%20"
-            f"{origin}%20to%20{dest}%20on%20{date}&curr=USD&tfs=CAEQAhoo"
-            f"&tfu=CgYIARABGAE&hl=en&gl=us&curr=USD"
+        origin = origins[0]
+        dest = destinations[0]
+        print(
+            f"\nGoogle Flights: https://www.google.com/travel/flights?"
+            f"q=Flights+from+{origin}+to+{dest}+on+{args.date}"
         )
-        print(f"\nGoogle Flights: {url}")
 
 
 if __name__ == "__main__":

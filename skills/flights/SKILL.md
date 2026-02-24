@@ -1,108 +1,107 @@
 ---
 name: flights
-description: Search flights via Google Flights. Find nonstop/connecting flights, filter by time, airline, and cabin class. Find cheapest dates to fly. No API key required.
+description: Search flights via Google Flights. Find nonstop/connecting flights, filter by time and cabin class, get booking links. Supports city names (NYC, London, Tokyo) with automatic multi-airport search. No API key required.
 ---
 
 # Flight Search
 
-Search real-time flight schedules and prices via Google Flights data using the `fli` CLI.
+Search real-time flight schedules and prices via Google Flights data.
 
 ## Prerequisites
 
 ```bash
-# Install via pip, pipx, or uv
-pip install flights
-# or
-pipx install flights
-# or
-uv tool install flights
+pip install fast-flights
 ```
 
-Verify: `fli --help`
+The `flights-search` CLI is bundled at `scripts/flights-search` in this skill directory.
 
-## Commands
-
-### `fli flights` — Search flights on a specific date
+## CLI Usage
 
 ```bash
-fli flights <origin> <destination> <date> [options]
+flights-search <origin> <destination> <date> [options]
 ```
 
-**Examples:**
+Origin and destination accept **IATA codes** (JFK, LAX) or **city names** (NYC, London, Tokyo). City names automatically search all airports in that metro area.
+
+### Examples
 
 ```bash
-# Basic search
-fli flights JFK LAX 2026-03-15
+# Search all NYC airports to LAX
+flights-search NYC LAX 2026-03-15
 
-# Nonstop only, sorted by departure time
-fli flights JFK LAX 2026-03-15 --stops 0 --sort DEPARTURE_TIME
+# Nonstop flights from NYC to Berlin
+flights-search NYC Berlin 2026-03-15 --nonstop
 
 # Evening departures only
-fli flights JFK LAX 2026-03-15 --time 18-24
+flights-search JFK LHR 2026-03-15 --after 17 --before 22
 
-# Business class on specific airlines
-fli flights JFK LHR 2026-03-15 --class BUSINESS --airlines BA VS
+# Business class
+flights-search NYC London 2026-03-15 --class business
 
-# Round-trip
-fli flights JFK LHR 2026-03-15 --return 2026-03-22
+# Multiple passengers with booking link
+flights-search SF Tokyo 2026-04-01 --passengers 2 --link
 ```
 
-**Options:**
+### Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--time` | `-t` | Departure time window, 24h format (e.g., `6-20`, `18-24`) |
-| `--airlines` | `-a` | Filter by airline IATA codes (e.g., `BA KL DL`) |
-| `--class` | `-c` | `ECONOMY`, `PREMIUM_ECONOMY`, `BUSINESS`, `FIRST` |
-| `--stops` | `-s` | `ANY`, `0` (nonstop), `1`, `2+` |
-| `--sort` | `-o` | `CHEAPEST`, `DURATION`, `DEPARTURE_TIME`, `ARRIVAL_TIME` |
-| `--return` | `-r` | Return date for round-trip (YYYY-MM-DD) |
+| Option | Description |
+|--------|-------------|
+| `--nonstop` | Nonstop flights only |
+| `--all-stops` | Show all flights regardless of stops |
+| `--after HH` | Depart after hour (24h format) |
+| `--before HH` | Depart before hour (24h format) |
+| `--class` | Cabin: economy, premium, business, first |
+| `--passengers N` | Number of travelers (default: 1) |
+| `--link` | Print Google Flights URL |
 
-### `fli dates` — Find cheapest dates to fly
+### Supported City Names
 
-```bash
-fli dates <origin> <destination> [options]
+When you use a city name, the CLI searches all airports in that metro area:
+
+| City | Airports |
+|------|----------|
+| NYC / New York | JFK, EWR, LGA |
+| LA / Los Angeles | LAX, BUR, LGB, ONT, SNA |
+| SF / San Francisco | SFO, OAK, SJC |
+| Chicago | ORD, MDW |
+| DC / Washington | DCA, IAD, BWI |
+| London | LHR, LGW, STN, LTN, LCY |
+| Paris | CDG, ORY |
+| Tokyo | NRT, HND |
+| Toronto | YYZ, YTZ |
+
+60+ metro areas supported. Use any IATA code directly for airports not in the list.
+
+## Default Behavior
+
+By default, the CLI shows only flights with the **minimum stops available**:
+- If nonstops exist → shows only nonstops
+- If no nonstops → shows only 1-stop flights
+- Use `--all-stops` to see everything
+
+## Output
+
 ```
+Searching from NYC: JFK, EWR, LGA
 
-**Examples:**
+Route        Depart                       Arrive                       Airline          Price       Duration
+------------------------------------------------------------------------------------------------------------
+EWR→LAX      6:00 AM on Sat, Mar 7        9:07 AM on Sat, Mar 7        United           $289        6 hr 7 min
+EWR→LAX      12:00 PM on Sat, Mar 7       3:14 PM on Sat, Mar 7        United           $289        6 hr 14 min
+JFK→LAX      8:00 AM on Sat, Mar 7        11:30 AM on Sat, Mar 7       Delta            $304        5 hr 30 min
 
-```bash
-# Cheapest dates in the next 2 months
-fli dates JFK LAX --sort
-
-# Cheapest Friday departures
-fli dates JFK LAX --friday --sort
-
-# Nonstop weekend flights in March
-fli dates JFK LAX --from 2026-03-01 --to 2026-03-31 --friday --saturday --stops 0
-
-# Round-trip with 7-day duration
-fli dates JFK LHR --round --duration 7 --sort
+3 flight(s) found.
 ```
-
-**Options:**
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--from` | | Start date (default: today) |
-| `--to` | | End date (default: +2 months) |
-| `--duration` | `-d` | Trip duration in days (default: 3) |
-| `--round` | `-R` | Search round-trip |
-| `--sort` | | Sort by price (lowest first) |
-| `--monday` through `--sunday` | `-mon` through `-sun` | Filter by day of week |
-| `--time` | `-time` | Departure time window (e.g., `6-20`) |
-| `--airlines` | `-a` | Filter by airline IATA codes |
-| `--class` | `-c` | Cabin class |
-| `--stops` | `-s` | Max stops |
 
 ## Notes
 
-- **Date format:** `YYYY-MM-DD`
-- **Airport codes:** Standard IATA codes (JFK, LAX, LHR, NRT, etc.)
-- **No API key required** — uses Google Flights data via reverse-engineered API
-- Prices shown in USD
+- Date format: `YYYY-MM-DD`
+- Airport codes: Standard IATA codes (JFK, LAX, LHR, etc.)
+- Prices are in USD
 - Times shown in local airport timezone
+- No API key required — uses Google Flights data via reverse-engineered protobuf API
+- Some routes may return price-only results (missing departure/arrival times) due to upstream parsing limitations
 
 ## Data Source
 
-Uses Google Flights data via the [`flights`](https://github.com/punitarani/fli) Python package. No scraping — uses Google's protobuf API directly.
+Uses Google Flights data via the [`fast-flights`](https://github.com/AWeirdDev/flights) Python package.
