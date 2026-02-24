@@ -1,4 +1,4 @@
-# Vercel Speed Optimization Skill
+# Vercel Speed Audit Skill
 
 Optimize Vercel build and deploy speed for any project. Run as a checklist when starting new projects or auditing existing ones.
 
@@ -69,7 +69,7 @@ For a team called `<team-slug>`:
 - **[docs/general.md](docs/general.md)** — Framework-agnostic Vercel optimizations
 - **[docs/github-actions-prebuilt.md](docs/github-actions-prebuilt.md)** — GitHub Actions + `vercel deploy --prebuilt` guide
 
-## Lessons from Running This (Aperture, Feb 2026)
+## Lessons Learned
 
 Real-world findings from running all 10 checks on a SvelteKit project with 16-18s builds:
 
@@ -86,5 +86,5 @@ Real-world findings from running all 10 checks on a SvelteKit project with 16-18
 1. **Triage:** Measure build times + check plan tier
 2. **Run applicable items** from the checklist based on decision tree
 3. If SvelteKit, also review `docs/sveltekit.md`
-4. Track findings in `research/vercel-speed/report.md`
+4. Track findings in a report file (e.g., `vercel-speed-report.md`)
 5. For complex CI needs, follow `docs/github-actions-prebuilt.md`
