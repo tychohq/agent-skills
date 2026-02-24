@@ -1,6 +1,7 @@
 ---
 name: architecture-research
 description: Research the architecture of a codebase or system. Reads source code, finds external context, explains design decisions, and produces ELK diagrams. Use when asked to understand, explain, or diagram how a repo/system is built.
+compatibility: "Requires: diagrams skill (clawhub install diagrams)"
 ---
 
 # Architecture Research
@@ -65,20 +66,32 @@ For each major angle, generate an **ELK JSON graph** (elkjs format), then **rend
 
 #### Rendering to SVG
 
-Use the bundled script to convert ELK JSON → SVG:
+This skill uses the **diagrams** skill for rendering. Install it if you haven't:
 
 ```bash
-# Prerequisite: elkjs must be installed globally
-# Use whatever package manager is available (npm, bun, pnpm, yarn)
-
-node <skill-dir>/scripts/elk-to-svg.mjs input.json output.svg
+clawhub install diagrams
 ```
 
-Replace `<skill-dir>` with the actual path to this skill's directory (e.g., the parent of this SKILL.md file).
+Then render ELK JSON → SVG using the diagrams skill's renderer:
+
+```bash
+# Single file
+node <diagrams-skill-dir>/scripts/render-elk.mjs diagram.json output.svg
+
+# Batch: all .json files in a folder → svg/ subfolder
+node <diagrams-skill-dir>/scripts/render-elk.mjs --dir <folder>
+
+# Batch + PNG (macOS only)
+node <diagrams-skill-dir>/scripts/render-elk.mjs --dir <folder> --png
+```
+
+Replace `<diagrams-skill-dir>` with the path to the installed diagrams skill directory.
+
+> **Note:** elkjs must be installed locally where you run the script. See the diagrams skill's SKILL.md for full setup.
 
 **Workflow for each diagram:**
 1. Write the ELK JSON to a `.json` file in the research folder
-2. Render: `node <skill-dir>/scripts/elk-to-svg.mjs diagram.json diagram.svg`
+2. Render: `node <diagrams-skill-dir>/scripts/render-elk.mjs diagram.json diagram.svg`
 3. Embed in the markdown doc: `![System Overview](system-overview.svg)`
 4. Keep both the `.json` (source of truth) and `.svg` (rendered) in the research folder
 
