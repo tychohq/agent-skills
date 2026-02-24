@@ -271,24 +271,42 @@ METRO_AREAS = {
     },
 }
 
-# Build lookup: lowercase alias/IATA → list of IATA codes
-_LOOKUP = {}
+# Build lookups: city/alias → list of IATA codes (expands to metro)
+# IATA codes resolve to themselves (exact airport), not the metro
+_CITY_LOOKUP = {}
 for _metro, _info in METRO_AREAS.items():
     codes = _info["airports"]
-    _LOOKUP[_metro.lower()] = codes
+    _CITY_LOOKUP[_metro.lower()] = codes
     for alias in _info["aliases"]:
-        _LOOKUP[alias.lower()] = codes
-    for code in codes:
-        _LOOKUP[code.lower()] = codes
+        _CITY_LOOKUP[alias.lower()] = codes
+
+# Known IATA codes (for detecting "this is a code, not a city")
+_KNOWN_IATA = set()
+for _info in METRO_AREAS.values():
+    for code in _info["airports"]:
+        _KNOWN_IATA.add(code.upper())
 
 
 def resolve_airports(code_or_city):
-    """Resolve a city name or IATA code to a list of airport codes."""
-    key = code_or_city.strip().lower()
-    if key in _LOOKUP:
-        return _LOOKUP[key]
-    # Assume it's an IATA code not in our map
-    return [code_or_city.strip().upper()]
+    """Resolve a city name or IATA code to a list of airport codes.
+
+    Known IATA codes resolve to themselves — not the full metro area.
+    City names and aliases expand to all airports in that metro.
+    Unknown 3-letter codes are passed through as-is.
+    """
+    raw = code_or_city.strip()
+    key = raw.lower()
+
+    # Check city/alias lookup first (handles "NYC", "nyc", "London", etc.)
+    if key in _CITY_LOOKUP:
+        return _CITY_LOOKUP[key]
+
+    # Then check if it's a known IATA code (exact airport, not metro)
+    if raw.upper() in _KNOWN_IATA:
+        return [raw.upper()]
+
+    # Assume it's an unknown IATA code
+    return [raw.upper()]
 
 
 def parse_departure_hour(departure_str):
@@ -517,12 +535,94 @@ def main():
     print(f"\n{len(all_flights)} flight(s) found.")
 
     if args.link:
+        # Google Flights search link for the overall query
         origin = origins[0]
         dest = destinations[0]
         print(
             f"\nGoogle Flights: https://www.google.com/travel/flights?"
             f"q=Flights+from+{origin}+to+{dest}+on+{args.date}"
         )
+
+        # Per-flight booking links for unique airline+route combos
+        seen_links = set()
+        for orig, dst, f in all_flights:
+            airline = getattr(f, "name", "").strip()
+            if not airline:
+                continue
+            link = get_airline_booking_url(airline, orig, dst, args.date)
+            if link and link not in seen_links:
+                seen_links.add(link)
+                print(f"  {airline} ({orig}→{dst}): {link}")
+
+
+# Airline name → booking URL builder
+# These are direct search URLs that pre-fill route/date on the airline's site
+AIRLINE_BOOKING_URLS = {
+    "united": lambda o, d, dt: (
+        f"https://www.united.com/en/us/fsr/choose-flights?"
+        f"f={o}&t={d}&d={dt}&tt=1&at=1&sc=7&px=1&taxng=1&newHP=True&clm=7&st=bestmatches"
+    ),
+    "delta": lambda o, d, dt: (
+        f"https://www.delta.com/flight-search/search?"
+        f"action=findFlights&tripType=ONE_WAY&departureDate={dt}"
+        f"&returnDate=&paxCount=1&searchByCabin=true&cabinFareClass=BE"
+        f"&originCity={o}&destinationCity={d}"
+    ),
+    "american": lambda o, d, dt: (
+        f"https://www.aa.com/booking/search?"
+        f"locale=en_US&pax=1&type=OneWay&searchType=Revenue"
+        f"&cabin=&carriers=ALL&slices=%5B%7B%22orig%22%3A%22{o}%22"
+        f"%2C%22dest%22%3A%22{d}%22%2C%22departDate%22%3A%22{dt}%22%7D%5D"
+    ),
+    "jetblue": lambda o, d, dt: (
+        f"https://www.jetblue.com/booking/flights?"
+        f"from={o}&to={d}&depart={dt}&is498RoundTrip=false&fareFamily=lowest"
+    ),
+    "southwest": lambda o, d, dt: (
+        f"https://www.southwest.com/air/booking/select.html?"
+        f"originationAirportCode={o}&destinationAirportCode={d}"
+        f"&departureDate={dt}&returnDate=&tripType=oneway&passengerType=ADULT&numberOfAdults=1"
+    ),
+    "spirit": lambda o, d, dt: (
+        f"https://www.spirit.com/book/flights?"
+        f"orgCode={o}&desCode={d}&departDate={dt}&adults=1&returnDate=&tripType=oneWay"
+    ),
+    "frontier": lambda o, d, dt: (
+        f"https://www.flyfrontier.com/booking/flights?"
+        f"from={o}&to={d}&departDate={dt}&adults=1&tripType=oneway"
+    ),
+    "alaska": lambda o, d, dt: (
+        f"https://www.alaskaair.com/shopping/flights?"
+        f"A=1&prior=&ShoppingMethod=oneway"
+        f"&prior=&prior=&prior=&prior=&prior=&prior=&prior=&prior=&prior="
+        f"&prior=&FO={o}&FD={d}&OD={dt}"
+    ),
+    "air canada": lambda o, d, dt: (
+        f"https://www.aircanada.com/booking/search?"
+        f"tripType=O&org0={o}&dest0={d}&departDate0={dt}&ADT=1"
+    ),
+    "british airways": lambda o, d, dt: (
+        f"https://www.britishairways.com/travel/book/public/en_us?"
+        f"origin={o}&destination={d}&departDate={dt}&cabin=M&adultCount=1&tripType=oneWay"
+    ),
+    "lufthansa": lambda o, d, dt: (
+        f"https://www.lufthansa.com/us/en/flight-search?"
+        f"origin={o}&destination={d}&outDate={dt}&pax=1ADT&tripType=OW"
+    ),
+}
+
+
+def get_airline_booking_url(airline_name, origin, dest, date):
+    """Try to generate a direct airline booking URL."""
+    name = airline_name.lower().strip()
+    # Try exact match first, then prefix match
+    for key, builder in AIRLINE_BOOKING_URLS.items():
+        if key in name or name in key:
+            try:
+                return builder(origin, dest, date)
+            except Exception:
+                return None
+    return None
 
 
 if __name__ == "__main__":
