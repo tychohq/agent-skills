@@ -4,16 +4,35 @@ A curated collection of agent skills — tested, maintained, and ready to use.
 
 These skills follow the open [Agent Skills](https://agentskills.io) standard (`SKILL.md` format) and work with Claude Code, Codex, Cursor, Copilot, Cline, Windsurf, OpenClaw, and 18+ other agent platforms.
 
+## Repo Structure
+
+```
+skills/              ← Platform-agnostic skills (discovered by skills.sh)
+openclaw-skills/     ← OpenClaw-specific skills (ClawHub only)
+```
+
+**`skills/`** — Works with any agent. Installed via `npx skills add` or `clawhub install`.
+
+**`openclaw-skills/`** — Depends on OpenClaw's session system, workspace layout, or cron infrastructure. Published to [ClawHub](https://clawhub.com) only. Not discovered by skills.sh.
+
 ## Install
 
 ### Via [skills.sh](https://skills.sh) (cross-agent)
 ```bash
+# Install all portable skills
 npx skills add brennerspear/agent-skills
+
+# Install a specific skill
+npx skills add brennerspear/agent-skills --skill commit
 ```
 
 ### Via [ClawHub](https://clawhub.com) (OpenClaw)
 ```bash
+# Portable skills
 clawhub install brennerspear/<skill-name>
+
+# OpenClaw-specific skills
+clawhub install brennerspear/<skill-name>  # from openclaw-skills/
 ```
 
 ### Manual
@@ -26,34 +45,36 @@ Copy any skill folder into your agent's skills directory.
 |---|---|
 | **[commit](skills/commit/)** | Create git commits with contextual messages and push |
 | **[deslop](skills/deslop/)** | Remove AI-style code slop from a branch |
-| **[merge-upstream](skills/merge-upstream/)** | Intelligently merge upstream changes from a fork |
-| **[create-mcp](skills/create-mcp/)** | Create MCP servers from API documentation |
 | **[diagrams](skills/diagrams/)** | Generate flow diagrams, architecture diagrams, system maps (ELK → SVG/PNG) |
 | **[architecture-research](skills/architecture-research/)** | Research and diagram codebase architecture |
 | **[tmux](skills/tmux/)** | Remote-control tmux sessions for interactive CLIs |
 | **[domain-check](skills/domain-check/)** | Check domain availability and manage domains via Vercel |
 | **[vercel](skills/vercel/)** | Deploy and manage Vercel projects |
-| **[vercel-speed](skills/vercel-speed/)** | Optimize Vercel build and deploy speed |
+| **[vercel-speed-audit](skills/vercel-speed-audit/)** | Audit and optimize Vercel build and deploy speed |
 
 ### Research & Productivity
 | Skill | Description |
 |---|---|
 | **[research](skills/research/)** | Conduct deep research with interactive + deep research modes |
 | **[flights](skills/flights/)** | Search flights via Google Flights |
-| **[cron-setup](skills/cron-setup/)** | Create and manage scheduled tasks |
-| **[self-reflection](skills/self-reflection/)** | Periodic self-reflection on recent sessions |
 
 ### Infrastructure
 | Skill | Description |
 |---|---|
 | **[caddy](skills/caddy/)** | Manage Caddy reverse proxy routes |
-| **[system-watchdog](skills/system-watchdog/)** | Monitor system health and resource usage |
+| **[dev-serve](skills/dev-serve/)** | Start and manage tmux-backed dev servers exposed via Caddy |
 
 ### Integrations
 | Skill | Description |
 |---|---|
-| **[agentmail](skills/agentmail/)** | AI-native email — create inboxes, send/receive programmatically |
 | **[amazon](skills/amazon/)** | Buy and return items on Amazon via browser automation |
+
+### OpenClaw-Specific (`openclaw-skills/`)
+| Skill | Description |
+|---|---|
+| **[cron-setup](openclaw-skills/cron-setup/)** | Create and manage OpenClaw cron jobs |
+| **[self-reflection](openclaw-skills/self-reflection/)** | Periodic self-reflection on recent sessions |
+| **[system-watchdog](openclaw-skills/system-watchdog/)** | Monitor system health with OpenClaw cron integration |
 
 ## Requirements
 
