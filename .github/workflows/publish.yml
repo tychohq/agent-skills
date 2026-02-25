@@ -33,53 +33,26 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - name: Find changed skills
-        id: changed
-        run: |
-          # Get skill dirs with changes in this push
-          changed_dirs=$(git diff --name-only HEAD~1 HEAD -- 'skills/' 'openclaw-skills/' \
-            | grep -oE '^(skills|openclaw-skills)/[^/]+' \
-            | sort -u)
-
-          if [ -z "$changed_dirs" ]; then
-            # workflow_dispatch: publish all
-            changed_dirs=$(find skills openclaw-skills -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
-          fi
-
-          echo "Changed skill dirs:"
-          echo "$changed_dirs"
-          # Pass as multiline output
-          {
-            echo "dirs<<EOF"
-            echo "$changed_dirs"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
       - name: Install ClawHub CLI
-        if: steps.changed.outputs.dirs != ''
         run: npm install -g clawhub
       - name: Authenticate with ClawHub
-        if: steps.changed.outputs.dirs != ''
         run: clawhub login --token "$CLAWHUB_TOKEN" --no-browser
         env:
           CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
-      - name: Publish changed skills
-        if: steps.changed.outputs.dirs != ''
+      - name: Publish skills with version changes
         run: |
           failed=0
-          succeeded=0
-          skipped=0
+          published=0
           up_to_date=0
           rate_limited=0
+          skipped=0
           errors=""
 
-          while IFS= read -r skill_dir; do
-            [ -z "$skill_dir" ] && continue
+          for skill_dir in skills/*/ openclaw-skills/*/; do
             [ -f "$skill_dir/SKILL.md" ] || continue
             skill_name=$(basename "$skill_dir")
 
-            # slug: field overrides name: for ClawHub publishing (avoids collisions)
+            # Read frontmatter fields
             slug=$(grep -m1 "^slug:" "$skill_dir/SKILL.md" | sed 's/^slug: *//')
             [ -z "$slug" ] && slug=$(grep -m1 "^name:" "$skill_dir/SKILL.md" | sed 's/^name: *//')
             version=$(grep -m1 "^version:" "$skill_dir/SKILL.md" | sed 's/^version: *//')
@@ -95,26 +68,41 @@ jobs:
               continue
             fi
 
-            echo "📦 Publishing $slug@$version from $skill_dir..."
+            # Check current version on ClawHub
+            remote_info=$(clawhub inspect "$slug" 2>&1 || true)
+            if echo "$remote_info" | grep -q "not found"; then
+              remote_version=""
+              echo "🆕 $slug@$version — new skill"
+            else
+              remote_version=$(echo "$remote_info" | grep "Latest:" | sed 's/.*Latest: *//')
+              if [ "$version" = "$remote_version" ]; then
+                echo "⏭️  $slug@$version — up to date"
+                up_to_date=$((up_to_date + 1))
+                continue
+              fi
+              echo "📦 $slug@$version — updating from $remote_version"
+            fi
+
+            # Publish
             if output=$(clawhub publish "$skill_dir" --slug "$slug" --version "$version" --changelog "Auto-publish from CI" 2>&1); then
               echo "✅ $slug@$version published"
-              succeeded=$((succeeded + 1))
-            elif echo "$output" | grep -qi "version already exists"; then
-              echo "⏭️  $slug@$version already up to date"
-              up_to_date=$((up_to_date + 1))
+              published=$((published + 1))
             elif echo "$output" | grep -qi "rate limit"; then
-              echo "⏳ $slug@$version rate limited (will publish on next push)"
+              echo "⏳ $slug@$version — rate limited (will retry next run)"
               rate_limited=$((rate_limited + 1))
+            elif echo "$output" | grep -qi "version already exists"; then
+              echo "⏭️  $slug@$version — already up to date"
+              up_to_date=$((up_to_date + 1))
             else
               echo "❌ $slug@$version failed: $output"
               errors="$errors\n  - $slug: $output"
               failed=$((failed + 1))
             fi
-          done <<< "${{ steps.changed.outputs.dirs }}"
+          done
 
           echo ""
           echo "=== Publish Summary ==="
-          echo "✅ Published:     $succeeded"
+          echo "✅ Published:     $published"
           echo "⏭️  Up to date:    $up_to_date"
           echo "⏳ Rate limited:  $rate_limited"
           echo "⚠️  Skipped:       $skipped"
@@ -126,7 +114,7 @@ jobs:
             echo -e "$errors"
           fi
 
-          # Only fail on real errors, not rate limits or already-published
+          # Only fail on real errors, not rate limits
           if [ "$failed" -gt 0 ]; then
             exit 1
           fi
