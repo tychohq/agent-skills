@@ -1,6 +1,6 @@
 ---
 name: research
-slug: deep-research
+slug: research-agent
 version: 1.0.0
 description: Conduct open-ended research on a topic, building a living markdown document. Supports interactive and deep research modes.
 ---
