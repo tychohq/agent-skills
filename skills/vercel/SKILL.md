@@ -1,5 +1,6 @@
 ---
 name: vercel
+version: 1.0.0
 description: Deploy and manage Vercel projects, including linking repositories, env vars, and domains.
 ---
 

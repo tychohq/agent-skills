@@ -1,5 +1,6 @@
 ---
 name: architecture-research
+version: 1.0.0
 description: Research the architecture of a codebase or system. Reads source code, finds external context, explains design decisions, and produces ELK diagrams. Use when asked to understand, explain, or diagram how a repo/system is built.
 compatibility: "Requires: diagrams skill (clawhub install diagrams)"
 ---

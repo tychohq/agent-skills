@@ -1,5 +1,6 @@
 ---
 name: diagrams
+version: 1.0.0
 description: Generate visual flow diagrams, architecture diagrams, and system maps as SVG/PNG. Use when the user asks for flowcharts, user flow diagrams, architecture diagrams, system diagrams, interaction maps, or any visual diagram. Supports ELK JSON layout engine with automatic rendering to SVG.
 ---
 

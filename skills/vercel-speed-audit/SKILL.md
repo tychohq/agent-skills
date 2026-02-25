@@ -1,5 +1,6 @@
 ---
 name: vercel-speed-audit
+version: 1.0.0
 description: Optimize Vercel build and deploy speed — audit checklist for new and existing projects.
 ---
 

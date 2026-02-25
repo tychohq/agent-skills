@@ -1,5 +1,6 @@
 ---
 name: cron-setup
+version: 1.0.0
 description: Create and manage OpenClaw cron jobs following our conventions. Use when setting up periodic tasks, reminders, automated checks, or any scheduled work.
 ---
 

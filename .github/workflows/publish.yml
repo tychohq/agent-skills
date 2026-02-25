@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'skills/**'
+      - 'openclaw-skills/**'
   workflow_dispatch:
 
 jobs:
@@ -39,4 +40,53 @@ jobs:
         env:
           CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
       - name: Publish all skills
-        run: clawhub sync --all --bump patch --changelog "Auto-publish from CI"
+        run: |
+          failed=0
+          succeeded=0
+          skipped=0
+          errors=""
+
+          for skill_dir in skills/*/ openclaw-skills/*/; do
+            [ -f "$skill_dir/SKILL.md" ] || continue
+            skill_name=$(basename "$skill_dir")
+
+            slug=$(grep -m1 "^name:" "$skill_dir/SKILL.md" | sed 's/^name: *//')
+            version=$(grep -m1 "^version:" "$skill_dir/SKILL.md" | sed 's/^version: *//')
+
+            if [ -z "$slug" ]; then
+              echo "⚠️  $skill_name: no name in frontmatter, skipping"
+              skipped=$((skipped + 1))
+              continue
+            fi
+            if [ -z "$version" ]; then
+              echo "⚠️  $skill_name: no version in frontmatter, skipping"
+              skipped=$((skipped + 1))
+              continue
+            fi
+
+            echo "📦 Publishing $slug@$version from $skill_dir..."
+            if output=$(clawhub publish "$skill_dir" --slug "$slug" --version "$version" --changelog "Auto-publish from CI" 2>&1); then
+              echo "✅ $slug@$version"
+              succeeded=$((succeeded + 1))
+            else
+              echo "❌ $slug@$version failed: $output"
+              errors="$errors\n  - $slug: $output"
+              failed=$((failed + 1))
+            fi
+          done
+
+          echo ""
+          echo "=== Publish Summary ==="
+          echo "✅ Succeeded: $succeeded"
+          echo "⚠️  Skipped:   $skipped"
+          echo "❌ Failed:     $failed"
+
+          if [ -n "$errors" ]; then
+            echo ""
+            echo "Failures:"
+            echo -e "$errors"
+          fi
+
+          if [ "$failed" -gt 0 ]; then
+            exit 1
+          fi

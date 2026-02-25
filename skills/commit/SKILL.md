@@ -1,5 +1,6 @@
 ---
 name: commit
+version: 1.0.0
 description: Create a git commit with a contextual message based on current changes, then push the branch.
 allowed-tools: [Bash]
 ---

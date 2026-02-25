@@ -1,5 +1,6 @@
 ---
 name: deslop
+version: 1.0.0
 description: Remove AI-style code slop from a branch by reviewing diffs, deleting inconsistent defensive noise, and preserving behavior and local style.
 allowed-tools: [Bash]
 ---

@@ -1,5 +1,6 @@
 ---
 name: domain-check
+version: 1.0.0
 description: Check domain availability via Vercel and buy/manage domains via Vercel CLI
 ---
 

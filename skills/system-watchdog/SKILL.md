@@ -1,5 +1,6 @@
 ---
 name: system-watchdog
+version: 1.0.0
 description: System resource monitoring that detects wasteful or suspicious processes. Outputs structured JSON for any consumer.
 ---
 

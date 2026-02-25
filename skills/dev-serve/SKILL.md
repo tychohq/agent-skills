@@ -1,5 +1,6 @@
 ---
 name: dev-serve
+version: 1.0.0
 description: Start and manage tmux-backed dev servers exposed through Caddy at wildcard subdomains.
 ---
 

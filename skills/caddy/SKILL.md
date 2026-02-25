@@ -1,5 +1,6 @@
 ---
 name: caddy
+version: 1.0.0
 description: Add, manage, and troubleshoot Caddy reverse proxy routes for local apps via wildcard subdomains.
 compatibility: macOS (LaunchDaemon) or Linux (systemd). Requires Caddy, Tailscale, Vercel DNS account.
 ---

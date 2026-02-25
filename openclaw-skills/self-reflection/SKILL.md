@@ -1,5 +1,6 @@
 ---
 name: self-reflection
+version: 1.0.0
 description: Periodic self-reflection on recent sessions. Analyzes what went well, what went wrong, and writes concise, actionable insights to the appropriate workspace files. Designed to run as a cron job.
 ---
 
