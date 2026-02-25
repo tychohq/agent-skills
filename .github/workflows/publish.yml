@@ -34,9 +34,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install ClawHub CLI
         run: npm install -g clawhub
-      - name: Publish all skills
+      - name: Authenticate with ClawHub
+        run: clawhub login --token "$CLAWHUB_TOKEN" --no-browser
         env:
           CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+      - name: Publish all skills
         run: |
           for skill_dir in skills/*/; do
             skill_name=$(basename "$skill_dir")
