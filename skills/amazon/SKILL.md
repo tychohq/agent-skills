@@ -1,5 +1,6 @@
 ---
-name: amazon-orders
+name: amazon
+slug: amazon-ordering
 version: 1.0.0
 description: Buy and return items on Amazon using browser automation. Use for purchasing, reordering, checking order history, and processing returns.
 compatibility: Requires agent-browser CLI with Chrome DevTools Protocol (CDP). Chrome must be running with --remote-debugging-port. Optional VNC for headless setups.

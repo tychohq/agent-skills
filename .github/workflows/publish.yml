@@ -71,6 +71,7 @@ jobs:
           succeeded=0
           skipped=0
           up_to_date=0
+          rate_limited=0
           errors=""
 
           while IFS= read -r skill_dir; do
@@ -78,7 +79,9 @@ jobs:
             [ -f "$skill_dir/SKILL.md" ] || continue
             skill_name=$(basename "$skill_dir")
 
-            slug=$(grep -m1 "^name:" "$skill_dir/SKILL.md" | sed 's/^name: *//')
+            # slug: field overrides name: for ClawHub publishing (avoids collisions)
+            slug=$(grep -m1 "^slug:" "$skill_dir/SKILL.md" | sed 's/^slug: *//')
+            [ -z "$slug" ] && slug=$(grep -m1 "^name:" "$skill_dir/SKILL.md" | sed 's/^name: *//')
             version=$(grep -m1 "^version:" "$skill_dir/SKILL.md" | sed 's/^version: *//')
 
             if [ -z "$slug" ]; then
@@ -99,6 +102,9 @@ jobs:
             elif echo "$output" | grep -qi "version already exists"; then
               echo "⏭️  $slug@$version already up to date"
               up_to_date=$((up_to_date + 1))
+            elif echo "$output" | grep -qi "rate limit"; then
+              echo "⏳ $slug@$version rate limited (will publish on next push)"
+              rate_limited=$((rate_limited + 1))
             else
               echo "❌ $slug@$version failed: $output"
               errors="$errors\n  - $slug: $output"
@@ -108,10 +114,11 @@ jobs:
 
           echo ""
           echo "=== Publish Summary ==="
-          echo "✅ Published:    $succeeded"
-          echo "⏭️  Up to date:   $up_to_date"
-          echo "⚠️  Skipped:      $skipped"
-          echo "❌ Failed:        $failed"
+          echo "✅ Published:     $succeeded"
+          echo "⏭️  Up to date:    $up_to_date"
+          echo "⏳ Rate limited:  $rate_limited"
+          echo "⚠️  Skipped:       $skipped"
+          echo "❌ Failed:         $failed"
 
           if [ -n "$errors" ]; then
             echo ""
@@ -119,6 +126,7 @@ jobs:
             echo -e "$errors"
           fi
 
+          # Only fail on real errors, not rate limits or already-published
           if [ "$failed" -gt 0 ]; then
             exit 1
           fi
