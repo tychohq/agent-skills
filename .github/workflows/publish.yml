@@ -39,9 +39,4 @@ jobs:
         env:
           CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
       - name: Publish all skills
-        run: |
-          for skill_dir in skills/*/; do
-            skill_name=$(basename "$skill_dir")
-            echo "Publishing $skill_name..."
-            clawhub publish "$skill_dir" --name "$skill_name" || echo "⚠️ Failed to publish $skill_name"
-          done
+        run: clawhub sync --all --bump patch --changelog "Auto-publish from CI"
