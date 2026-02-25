@@ -9,16 +9,27 @@ Search real-time flight schedules and prices via Google Flights data.
 
 ## Prerequisites
 
+- **Python 3.9+**
+- **`fast-flights`** library — installed automatically if you use `uvx`, or install manually:
+
 ```bash
 pip install fast-flights
+# or
+uv pip install fast-flights
 ```
 
 The `flights-search` CLI is bundled at `scripts/flights-search` in this skill directory.
 
 ## CLI Usage
 
+Run via `uvx` (no install needed — handles dependencies automatically):
 ```bash
-flights-search <origin> <destination> <date> [options]
+uvx --with fast-flights python3 scripts/flights-search <origin> <destination> <date> [options]
+```
+
+Or if `fast-flights` is already installed:
+```bash
+python3 scripts/flights-search <origin> <destination> <date> [options]
 ```
 
 Origin and destination accept **IATA codes** (JFK, LAX) or **city names** (NYC, London, Tokyo). City names automatically search all airports in that metro area.
