@@ -113,3 +113,4 @@ Check current jobs anytime with the `cron list` tool. As of setup:
 - `system-watchdog` — Daily 4 AM, checks system resources
 - `OpenClaw Daily News Digest` — Daily 6 AM, generates news digest
 - `sticker-sales-loop` — Weekly Monday 2 PM, agent outreach for sticker store
+

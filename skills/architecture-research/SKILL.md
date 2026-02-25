@@ -159,3 +159,4 @@ Send a brief summary (L2 — 75-150 words) in chat with key findings. Attach or 
 - **Excalidraw:** If the user asks for Excalidraw output instead of ELK, you can try, but ELK JSON is the default.
 - **Mermaid fallback:** If the user's tooling can't render ELK, offer Mermaid as a fallback.
 - **Scope control:** For large repos, focus on the architectural skeleton first. Offer to go deeper into specific subsystems on request.
+

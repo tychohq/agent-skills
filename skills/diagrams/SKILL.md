@@ -142,3 +142,4 @@ Common `layoutOptions` values:
 - **`labels` vs `label`:** `labels` (array) is what ELK uses for layout spacing. `label` (string) is what gets rendered in the SVG. Always set both — `labels[0].text` should approximate the display label length for correct sizing.
 - **`package.json` must have `"type": "module"`** for the ESM import to work.
 - **elkjs must be installed locally** in the directory where you run the script. It's not global.
+

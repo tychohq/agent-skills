@@ -233,3 +233,4 @@ browser pdf → save to research/<topic-slug>/<descriptive-name>.pdf
 See `SETUP.md` for first-time installation of:
 - `parallel-research` CLI
 - PDF export tools (pandoc, PyMuPDF)
+
