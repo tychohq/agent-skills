@@ -4,3 +4,6 @@ node_modules/
 .env
 .env.*
 tmp/
+
+# OpenClaw Discord channel mapping
+.discord-channel
