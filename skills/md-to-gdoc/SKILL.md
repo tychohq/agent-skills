@@ -1,6 +1,6 @@
 ---
 name: md-to-gdoc
-version: 1.0.0
+version: 1.0.1
 description: Convert markdown files to properly formatted Google Docs. Use when asked to create a Google Doc from markdown, upload markdown to Google Docs, put a .md file into Google Docs, or convert research/notes/documents to Google Docs format.
 ---
 
