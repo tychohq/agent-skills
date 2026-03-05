@@ -8,6 +8,11 @@ description: Convert markdown files to properly formatted Google Docs. Use when 
 
 Convert `.md` files into Google Docs with proper heading styles, bold, code blocks, lists, links, and blockquotes.
 
+## Requirements
+
+- **[gog](https://github.com/tychohq/gog)** — Google Workspace CLI (must be authenticated: `gog auth add <email>`)
+- **python3** — used for JSON parsing in the script
+
 ## Quick Start
 
 ```bash
