@@ -45,11 +45,7 @@ Resolve `scripts/` relative to this skill's directory.
 
 - `--title` — Doc title. Defaults to filename with hyphens→spaces.
 - `--parent` — Google Drive folder ID to place the doc in.
-- `--account` — Google account email. Defaults to `brenner@tycho.works`.
-
-## Common Folder IDs
-
-See `docs/google-drive-map.md` in the workspace for Brenner's Drive folder structure.
+- `--account` — Google account email. Defaults to gog's default (first authenticated account).
 
 ## Troubleshooting
 

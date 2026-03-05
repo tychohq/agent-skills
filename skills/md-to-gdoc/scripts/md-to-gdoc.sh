@@ -6,7 +6,7 @@
 #
 # Defaults:
 #   --title:   derived from filename (e.g. my-research.md → "my research")
-#   --account: blspear@gmail.com
+#   --account: uses gog's default account (first authenticated)
 #
 # Outputs the Google Doc URL on success.
 
@@ -16,7 +16,7 @@ set -euo pipefail
 MD_FILE=""
 TITLE=""
 PARENT=""
-ACCOUNT="brenner@tycho.works"
+ACCOUNT=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -54,7 +54,10 @@ if [[ -z "$TITLE" ]]; then
 fi
 
 # --- Step 1: Create empty Google Doc ---
-CREATE_ARGS=(docs create "$TITLE" --account "$ACCOUNT" --json --force)
+CREATE_ARGS=(docs create "$TITLE" --json --force)
+if [[ -n "$ACCOUNT" ]]; then
+  CREATE_ARGS+=(--account "$ACCOUNT")
+fi
 if [[ -n "$PARENT" ]]; then
   CREATE_ARGS+=(--parent "$PARENT")
 fi
@@ -78,11 +81,11 @@ echo "Created doc: $DOC_ID" >&2
 # The `update --format=markdown` path uses MarkdownToDocsRequests() which
 # properly applies UpdateParagraphStyle with namedStyleType for headings.
 echo "Writing formatted content..." >&2
-UPDATE_OUTPUT=$(gog docs update "$DOC_ID" \
-  --content-file "$MD_FILE" \
-  --format=markdown \
-  --account "$ACCOUNT" \
-  --force 2>&1)
+UPDATE_ARGS=(docs update "$DOC_ID" --content-file "$MD_FILE" --format=markdown --force)
+if [[ -n "$ACCOUNT" ]]; then
+  UPDATE_ARGS+=(--account "$ACCOUNT")
+fi
+UPDATE_OUTPUT=$(gog "${UPDATE_ARGS[@]}" 2>&1)
 
 UPDATE_EXIT=$?
 if [[ $UPDATE_EXIT -ne 0 ]]; then
