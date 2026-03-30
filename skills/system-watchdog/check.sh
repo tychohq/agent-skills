@@ -65,6 +65,7 @@ disk_pct = int(df_out[4].rstrip('%'))
 
 # Processes
 ps_out = subprocess.check_output(["ps", "axo", "pid=,pcpu=,rss=,etime=,ucomm=", "-r"]).decode()
+all_procs = []
 issues = []
 top_procs = []
 
@@ -79,20 +80,71 @@ for i, line in enumerate(ps_out.strip().split('\n')):
         elapsed_secs = 0
     elapsed_h = human_elapsed(elapsed_secs)
     
-    proc = {"pid": pid, "name": name, "cpu_pct": cpu, "mem_mb": mem_mb, "elapsed": elapsed_h}
-    
+    proc = {"pid": pid, "name": name, "cpu_pct": cpu, "mem_mb": mem_mb, "elapsed": elapsed_h, "elapsed_secs": elapsed_secs}
+    all_procs.append(proc)
+
+# Get real physical footprint for top processes (macOS footprint command)
+def get_phys_footprint(pid):
+    """Get real physical memory footprint including GPU/Metal on macOS."""
+    try:
+        out = subprocess.run(["footprint", str(pid)], capture_output=True, text=True, timeout=5)
+        if out.returncode != 0:
+            return None
+        for line in out.stdout.split('\n'):
+            if 'phys_footprint:' in line:
+                m = re.search(r'phys_footprint:\s+([\d.]+)\s*(GB|MB|KB|bytes)', line)
+                if m:
+                    val = float(m.group(1))
+                    unit = m.group(2)
+                    if unit == 'GB': return int(val * 1024)
+                    if unit == 'MB': return int(val)
+                    if unit == 'KB': return int(val / 1024)
+                    return int(val / (1024*1024))
+    except Exception:
+        return None
+    return None
+
+# Footprint ALL non-trivial processes — including "ignored" ones.
+# RSS is blind to GPU/Metal unified memory (e.g., an LM Studio node
+# worker shows 11 MB RSS but 21 GB real footprint). The SKIP list gates
+# anomaly alerts, NOT footprinting — hidden memory can live in any process.
+for proc in all_procs:
+    if proc["pid"] < 100:
+        continue
+    # Skip truly tiny processes to save time
+    if proc["mem_mb"] < 5 and proc["cpu_pct"] < 5:
+        continue
+    footprint_mb = get_phys_footprint(proc["pid"])
+    if footprint_mb is not None:
+        proc["phys_footprint_mb"] = footprint_mb
+        # Check for hidden memory (GPU/Metal) — >2x RSS and >1GB
+        if footprint_mb > proc["mem_mb"] * 2 and footprint_mb > 1024:
+            hidden_gb = (footprint_mb - proc["mem_mb"]) / 1024
+            issues.append({
+                "type": "hidden_memory",
+                "description": f"{proc['name']} (PID {proc['pid']}) shows {proc['mem_mb']}MB RSS but {footprint_mb}MB real footprint — likely GPU/Metal model loaded in unified memory ({hidden_gb:.1f}GB hidden)",
+                "details": proc
+            })
+
+# Build top_procs and check for issues
+for i, proc in enumerate(sorted(all_procs, key=lambda p: (p.get("phys_footprint_mb", p["mem_mb"]), p["cpu_pct"]), reverse=True)):
     if i < 10:
         top_procs.append(proc)
     
-    if name in SKIP or pid < 100:
+    if proc["name"] in SKIP or proc["pid"] < 100:
         continue
     
-    if mem_mb > THRESH_RAM_MB:
-        issues.append({"type": "high_ram", "description": f"{name} (PID {pid}) {mem_mb}MB RAM", "details": proc})
-    if cpu > THRESH_CPU_PCT:
-        issues.append({"type": "high_cpu", "description": f"{name} (PID {pid}) {cpu}% CPU", "details": proc})
-    if elapsed_secs > THRESH_STALE_DAYS * 86400 and (mem_mb > 100 or cpu > 1):
-        issues.append({"type": "stale", "description": f"{name} (PID {pid}) running {elapsed_h}, {mem_mb}MB", "details": proc})
+    # Use phys_footprint if available, otherwise RSS
+    effective_mem_mb = proc.get("phys_footprint_mb", proc["mem_mb"])
+    
+    if effective_mem_mb > THRESH_RAM_MB:
+        mem_source = "phys footprint" if "phys_footprint_mb" in proc else "RSS"
+        issues.append({"type": "high_ram", "description": f"{proc['name']} (PID {proc['pid']}) {effective_mem_mb}MB {mem_source}", "details": proc})
+    
+    if proc["cpu_pct"] > THRESH_CPU_PCT:
+        issues.append({"type": "high_cpu", "description": f"{proc['name']} (PID {proc['pid']}) {proc['cpu_pct']}% CPU", "details": proc})
+    if proc["elapsed_secs"] > THRESH_STALE_DAYS * 86400 and (effective_mem_mb > 100 or proc["cpu_pct"] > 1):
+        issues.append({"type": "stale", "description": f"{proc['name']} (PID {proc['pid']}) running {proc['elapsed']}, {effective_mem_mb}MB", "details": proc})
 
 if disk_pct > THRESH_DISK_PCT:
     issues.append({"type": "disk", "description": f"Root disk at {disk_pct}%", "details": {"mount": "/", "used_pct": disk_pct, "used_gb": disk_used, "total_gb": disk_total}})
