@@ -64,15 +64,45 @@ disk_total, disk_used = int(df_out[1]), int(df_out[2])
 disk_pct = int(df_out[4].rstrip('%'))
 
 # Processes
-ps_out = subprocess.check_output(["ps", "axo", "pid=,pcpu=,rss=,etime=,ucomm=", "-r"]).decode()
+ps_out = subprocess.check_output(["ps", "axo", "pid=,pcpu=,rss=,etime=,comm=,args=", "-r"]).decode()
 all_procs = []
 issues = []
 top_procs = []
 
+def enrich_process_name(name, command):
+    """Enrich generic names (node, python3, etc.) with app context from command string."""
+    low = (command or "").lower()
+    generic_names = {"node", "python", "python3", "ruby", "java", "bash", "sh", "zsh"}
+    if (name or "").lower() not in generic_names:
+        return name
+    m = re.search(r'/([^/]+)\.app/', command)
+    if m:
+        app_name = m.group(1)
+        if 'llmworker' in low:
+            return f"{app_name} (llmworker)"
+        return app_name
+    if '.lmstudio' in low:
+        return "LM Studio (llmworker)" if 'llmworker' in low else "LM Studio"
+    parts = command.split()
+    for part in parts:
+        if part.endswith('.js') or part.endswith('.py') or part.endswith('.rb'):
+            script = os.path.basename(part)
+            if script and script != name:
+                return f"{name} ({script})"
+            break
+    return name
+
 for i, line in enumerate(ps_out.strip().split('\n')):
     parts = line.split(None, 4)
     if len(parts) < 5: continue
-    pid, cpu, rss, elapsed, name = int(parts[0]), float(parts[1]), int(parts[2]), parts[3], parts[4].strip()
+    pid, cpu, rss, elapsed, rest = int(parts[0]), float(parts[1]), int(parts[2]), parts[3], parts[4].strip()
+    # rest = "comm args" — split on first space after comm path
+    # comm can contain spaces in path, but args start after the comm binary
+    comm_parts = rest.split(None, 1) if rest else ["unknown", ""]
+    comm = comm_parts[0]
+    command = rest
+    name = os.path.basename(comm).strip() or "unknown"
+    name = enrich_process_name(name, command)
     mem_mb = rss // 1024
     try:
         elapsed_secs = parse_elapsed(elapsed)
@@ -80,7 +110,7 @@ for i, line in enumerate(ps_out.strip().split('\n')):
         elapsed_secs = 0
     elapsed_h = human_elapsed(elapsed_secs)
     
-    proc = {"pid": pid, "name": name, "cpu_pct": cpu, "mem_mb": mem_mb, "elapsed": elapsed_h, "elapsed_secs": elapsed_secs}
+    proc = {"pid": pid, "name": name, "command": command, "cpu_pct": cpu, "mem_mb": mem_mb, "elapsed": elapsed_h, "elapsed_secs": elapsed_secs}
     all_procs.append(proc)
 
 # Get real physical footprint for top processes (macOS footprint command)
