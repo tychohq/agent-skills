@@ -1,3 +1,8 @@
+---
+name: supabase
+description: Supabase helper commands for creating projects, fetching keys, and linking local projects.
+---
+
 ### Supabase
 
 Create a new project:

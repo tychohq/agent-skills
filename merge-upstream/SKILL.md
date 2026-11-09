@@ -1,3 +1,8 @@
+---
+name: merge-upstream
+description: Intelligently merge upstream changes from a forked repository with safe discovery and summaries.
+---
+
 # Merge Upstream
 
 Intelligently merge upstream changes from a forked repository. Automatically discovers the upstream remote, default branches, and sync status before merging.

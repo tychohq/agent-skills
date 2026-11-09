@@ -16,6 +16,14 @@ agent-browser fill @e2 "text"   # Fill input by ref
 agent-browser close             # Close browser
 ```
 
+## Default Profile (Global)
+
+- Default Chrome profile for automation: `~/.agents/browser/profiles/blspear`
+- Always use this profile by default for login flows (Google SSO lives here).
+- Always enable remote debugging so agent-browser can attach.
+- macOS: run headfully.
+- Linux: run headless.
+
 ## Core workflow
 
 1. Navigate: `agent-browser open <url>`

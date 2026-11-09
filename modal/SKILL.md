@@ -1,3 +1,8 @@
+---
+name: modal
+description: Modal.com deployment helpers and common commands.
+---
+
 ### Modal
 
 **App naming:** All files in a project should use the same `modal.App("app-name")`. Different app names create separate deployments.
